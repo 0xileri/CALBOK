@@ -12,10 +12,12 @@ export function useSectionTransition<T>(initial:T) {
     if(timer.current)clearTimeout(timer.current);
     if(next===current.current){setPhase('idle');return;}
     if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      window.scrollTo(0,0);
       current.current=next;setView(next);setPhase('idle');return;
     }
     setPhase('leaving');
     timer.current=setTimeout(()=>{
+      window.scrollTo(0,0);
       current.current=next;
       setView(next);
       setPhase('entering');
