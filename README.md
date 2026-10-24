@@ -31,7 +31,7 @@ npm.cmd run dev
 Open [CALBOK](http://127.0.0.1:3000). No account or provider key is needed to lock a local prospective call. Store secrets only in `.env.local`; never paste them into a receipt.
 
 1. Log a caller and original text. Search the 439-symbol Tatum catalog or use GMGN to select a token by chain and contract address. Coin, direction and horizon have no silent defaults.
-2. Submit to lock a timestamped structured contract and snapshot hash.
+2. Review the original text, exact market, direction and horizon before confirming. Back to edit preserves the draft. Confirm to lock the server timestamp, deadline, structured contract and snapshot hash; review alone creates no receipt.
 3. Open the receipt to inspect its ID, UTC timestamps and source link. Use **Download PNG** for a branded image, or **Copy summary** for the full text record. PNGs are rendered locally in the browser; the expandable text preview also supports manual copying.
 4. After the deadline, use **Check settlement**. Missing credentials/coverage remain explicit errors; no result is invented.
 5. Once settled, use **Remember outcome**, then **Check context**. Only a completed job with a blob ID counts as a memory.
