@@ -1,0 +1,36 @@
+{
+  "verifiedAt": "2026-10-24T15:18:16.413Z",
+  "sui": {
+    "network": "mainnet",
+    "provider": "Tatum",
+    "transport": "gRPC",
+    "method": "sui.rpc.v2.StateService/GetCoinInfo",
+    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+    "id": "0xf256d3fb6a50eaa748d94335b34f2982fbc3b63ceec78cafaa29ebc9ebaf2bbc",
+    "symbol": "SUI",
+    "decimals": 9,
+    "name": "Sui",
+    "responseHash": "8550b47156c8af3041528759df682b74439427612a3d19ce57a7307007687a23",
+    "verifiedAt": "2026-10-24T15:18:17.435Z"
+  },
+  "pricing": {
+    "asset": "BTC",
+    "provider": "Tatum",
+    "interval": "1m",
+    "requestedBoundary": 1792851480000,
+    "candle": {
+      "openTime": 1792851480000,
+      "closeTime": 1792851540000,
+      "open": "80155.50000000",
+      "high": "80189.14000000",
+      "low": "80026.31000000",
+      "close": "80142.04000000",
+      "sourceCloseTime": 1792851539999,
+      "hash": "ff42f1ad8974e51342396cc02e66afd0fd410ebafc85ec500d8748a722878b0d"
+    }
+  },
+  "walrus": {
+    "authenticatedRecall": true,
+    "memoryWritesSubmitted": 0
+  }
+}
