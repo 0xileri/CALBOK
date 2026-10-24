@@ -5,7 +5,7 @@ export function authorize(request:Request) {
   const origin = request.headers.get('origin');
   // Next's internal request URL may say localhost while the browser uses
   // 127.0.0.1. Compare to the actual Host header, retaining the protocol check.
-  const requestOrigin=`${new URL(request.url).protocol}//${host.toLowerCase()}`;
+  const requestOrigin=process.env.CALBOK_PUBLIC_ORIGIN || `${new URL(request.url).protocol}//${host.toLowerCase()}`;
   if (origin && origin !== requestOrigin) return Response.json({error:'Cross-origin requests refused.'},{status:403});
   if (token) {
     const supplied = request.headers.get('authorization')?.replace(/^Bearer /,'') || '';

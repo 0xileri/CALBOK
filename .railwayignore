@@ -1,0 +1,16 @@
+*
+!app/
+!app/**
+!components/
+!components/**
+!lib/
+!lib/**
+!scripts/
+!scripts/start-railway.mjs
+!package.json
+!package-lock.json
+!next.config.ts
+!next-env.d.ts
+!tsconfig.json
+!Dockerfile
+!.dockerignore

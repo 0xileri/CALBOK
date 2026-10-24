@@ -18,3 +18,12 @@ test('operator token required when configured',()=>{
 test('request size bounded during streaming',async()=>{
   await assert.rejects(()=>body(new Request('http://localhost/api',{method:'POST',body:'a'.repeat(9000)})),/too large/);
 });
+test('HTTPS proxy deployment accepts only the configured browser origin',()=>{
+  process.env.CALBOK_ADMIN_TOKEN='test-only-token';
+  process.env.CALBOK_PUBLIC_ORIGIN='https://calbok.example';
+  const headers={host:'calbok.example',authorization:'Bearer test-only-token',origin:'https://calbok.example'};
+  assert.equal(authorize(new Request('http://internal:3000/api',{headers})),undefined);
+  assert.equal(authorize(new Request('http://internal:3000/api',{headers:{...headers,origin:'https://evil.example'}}))?.status,403);
+  delete process.env.CALBOK_PUBLIC_ORIGIN;
+  delete process.env.CALBOK_ADMIN_TOKEN;
+});
