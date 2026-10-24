@@ -74,7 +74,7 @@ export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Opti
     const due=database.prepare(`SELECT j.prediction_id FROM settlement_jobs j JOIN predictions p ON p.id=j.prediction_id
       LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND j.status IN ('queued','retry','running')
       AND j.next_attempt_at<=? AND (j.lease_until IS NULL OR j.lease_until<=?)
-      AND p.deadline<=? ORDER BY j.next_attempt_at LIMIT 3`).all(iso,iso,new Date(now-60_000).toISOString()) as {prediction_id:string}[];
+      AND p.deadline<=? AND (COALESCE((SELECT owner_id FROM prediction_owners WHERE prediction_id=p.id),'operator')='operator' OR ?=1) ORDER BY j.next_attempt_at LIMIT 3`).all(iso,iso,new Date(now-60_000).toISOString(),process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0) as {prediction_id:string}[];
     for(const job of due)await runSettlement(job.prediction_id,{clock,fetchCandles});
   } catch {database.prepare("UPDATE worker_state SET last_error='WORKER_TICK_FAILED' WHERE id=1 AND owner=?").run(owner);}
   finally {database.prepare('UPDATE worker_state SET heartbeat_at=?,lease_until=NULL,owner=NULL WHERE id=1 AND owner=?').run(new Date(clock()).toISOString(),owner);}

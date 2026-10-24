@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import nextEnv from '@next/env';
 nextEnv.loadEnvConfig(process.cwd());
 const files=execFileSync('git',['diff','--cached','--name-only','-z'],{encoding:'utf8'}).split('\0').filter(Boolean);
-const keys=['TATUM_API_KEY','GMGN_API_KEY','GMGN_PRIVATE_KEY','MEMWAL_PRIVATE_KEY','MEMWAL_ACCOUNT_ID','CALBOK_ADMIN_TOKEN','X_BEARER_TOKEN'];
+const keys=['TATUM_API_KEY','GMGN_API_KEY','GMGN_PRIVATE_KEY','MEMWAL_PRIVATE_KEY','MEMWAL_ACCOUNT_ID','CALBOK_ADMIN_TOKEN','CALBOK_SESSION_SECRET','RESEND_API_KEY','X_BEARER_TOKEN'];
 let failed=false;
 for(const file of files){
   if((file.startsWith('.env')&&file!=='.env.example')||file.startsWith('data/')||file.endsWith('.sqlite')){console.error('Private file staged:',file);failed=true;continue;}

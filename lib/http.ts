@@ -1,16 +1,13 @@
-import { timingSafeEqual } from 'node:crypto';
+import {principal} from './auth';
+export function originGuard(request:Request,requireOrigin=false) {
+  const origin=request.headers.get('origin');
+  const expected=process.env.CALBOK_PUBLIC_ORIGIN||`${new URL(request.url).protocol}//${(request.headers.get('host')||'').toLowerCase()}`;
+  if((requireOrigin&&!origin)||(origin&&origin!==expected))return Response.json({error:'Cross-origin requests refused.'},{status:403});
+}
 export function authorize(request:Request) {
-  const token = process.env.CALBOK_ADMIN_TOKEN;
-  const host = request.headers.get('host') || '';
-  const origin = request.headers.get('origin');
-  // Next's internal request URL may say localhost while the browser uses
-  // 127.0.0.1. Compare to the actual Host header, retaining the protocol check.
-  const requestOrigin=process.env.CALBOK_PUBLIC_ORIGIN || `${new URL(request.url).protocol}//${host.toLowerCase()}`;
-  if (origin && origin !== requestOrigin) return Response.json({error:'Cross-origin requests refused.'},{status:403});
-  if (token) {
-    const supplied = request.headers.get('authorization')?.replace(/^Bearer /,'') || '';
-    if (Buffer.byteLength(supplied)!==Buffer.byteLength(token) || !timingSafeEqual(Buffer.from(supplied),Buffer.from(token))) return Response.json({error:'Operator token required.'},{status:401});
-  } else if (!/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host)) return Response.json({error:'Configure an operator token before remote access.'},{status:403});
+  const denied=originGuard(request);if(denied)return denied;
+  if(principal(request))return;
+  return Response.json({error:process.env.CALBOK_ADMIN_TOKEN?'Sign in to open your private journal.':'Configure an operator token before remote access.'},{status:process.env.CALBOK_ADMIN_TOKEN?401:403});
 }
 export async function body(request:Request) {
   const reader = request.body?.getReader();

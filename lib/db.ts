@@ -38,23 +38,29 @@ export function db() {
       heartbeat_at TEXT, last_error TEXT);
     CREATE TRIGGER IF NOT EXISTS freeze_prediction BEFORE UPDATE ON predictions BEGIN SELECT RAISE(ABORT,'Locked predictions are immutable'); END;
     CREATE TRIGGER IF NOT EXISTS freeze_settlement BEFORE UPDATE ON settlements BEGIN SELECT RAISE(ABORT,'Settlements are immutable'); END;`);
+  instance.exec(`CREATE TABLE IF NOT EXISTS prediction_owners(prediction_id TEXT PRIMARY KEY REFERENCES predictions(id),owner_id TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS prediction_owner_idx ON prediction_owners(owner_id);
+    CREATE TRIGGER IF NOT EXISTS freeze_prediction_owner BEFORE UPDATE ON prediction_owners BEGIN SELECT RAISE(ABORT,'Receipt ownership is immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS keep_prediction_owner BEFORE DELETE ON prediction_owners BEGIN SELECT RAISE(ABORT,'Receipt ownership is immutable'); END;`);
   return instance;
 }
 export type Receipt = {id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
 export const hash = (value:string) => createHash('sha256').update(value).digest('hex');
-export function listReceipts():Receipt[] { return db().prepare('SELECT p.*, a.symbol AS asset_symbol, a.provider AS asset_provider, s.outcome, s.evidence, s.method FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id LEFT JOIN assets a ON a.id=p.asset ORDER BY p.locked_at DESC').all() as unknown as Receipt[]; }
+export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("SELECT p.*, a.symbol AS asset_symbol, a.provider AS asset_provider, s.outcome, s.evidence, s.method FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id LEFT JOIN assets a ON a.id=p.asset LEFT JOIN prediction_owners o ON o.prediction_id=p.id"+(ownerId?" WHERE COALESCE(o.owner_id,'operator')=?":"")+' ORDER BY p.locked_at DESC').all(...(ownerId?[ownerId]:[])) as unknown as Receipt[]; }
+export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}
 export function registerAsset(asset:Asset){db().prepare('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?)').run(asset.id,asset.symbol,asset.name,asset.provider,asset.chain||null,asset.address||null,asset.discoveredAt||new Date().toISOString());}
 export function knownAsset(id:string):Asset|null{const row=db().prepare('SELECT * FROM assets WHERE id=?').get(id) as Record<string,string>|undefined;return row?{id:row.id,symbol:row.symbol,name:row.name,provider:row.provider as Asset['provider'],chain:row.chain,address:row.address}:null;}
-export function capture(claim:Claim) {
+export function capture(claim:Claim,ownerId='operator') {
   const assetMetadata=knownAsset(claim.asset);
   if(parseGmgnAssetId(claim.asset)&&!assetMetadata)throw new Error('GMGN token must be discovered and selected first');
   const now = new Date(), id = `CB-${randomUUID()}`;
   const deadline = new Date(now.getTime()+(claim.horizon==='24h'?24:168)*3600_000).toISOString();
   const snapshot = JSON.stringify({...claim,id,lockedAt:now.toISOString(),deadline,method:'directional-open-v1',...(assetMetadata?{assetMetadata}:{})});
-  const fingerprint = hash(JSON.stringify([claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon]));
+  const fingerprint = hash(JSON.stringify([...(ownerId==='operator'?[]:[ownerId]),claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon]));
   const database = db(); database.exec('BEGIN IMMEDIATE');
   try {
     database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,claim.caller,claim.asset,claim.direction,claim.horizon,claim.text,claim.sourceUrl,now.toISOString(),deadline,fingerprint,hash(snapshot),'self_logged_before_outcome',snapshot);
+    database.prepare('INSERT INTO prediction_owners VALUES (?,?)').run(id,ownerId);
     database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_locked',hash(snapshot),now.toISOString());
     database.prepare('INSERT INTO settlement_jobs (prediction_id,next_attempt_at,updated_at) VALUES (?,?,?)').run(id,new Date(Date.parse(deadline)+60_000).toISOString(),now.toISOString());
     database.exec('COMMIT'); return id;

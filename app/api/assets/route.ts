@@ -1,3 +1,4 @@
+import {principal} from '@/lib/auth';
 import {z} from 'zod';
 import {authorize,rateLimit,body} from '@/lib/http';
 import {GMGN_CHAINS,TATUM_CATALOG,tatumAssets,isAllowedAsset,parseGmgnAssetId} from '@/lib/assets';
@@ -16,6 +17,7 @@ export async function GET(request:Request){
   if(!input.success)return Response.json({error:'Invalid asset search.'},{status:400});
   const {q,provider,chain}=input.data;
   if(provider==='Tatum')return Response.json({assets:tatumAssets(q),catalog:TATUM_CATALOG,note:'Documented provider markets. Historical candle coverage is verified per call.'});
+  if(principal(request)!.role!=='operator'&&process.env.CALBOK_USER_PROVIDER_ACCESS!=='true')return Response.json({error:'Live provider search is not enabled for member accounts yet.'},{status:403});
   if(q.length<2)return Response.json({assets:[],note:'Enter at least 2 characters or paste a contract address.'});
   const key=JSON.stringify([q,chain]),cached=cache.get(key);
   if(cached&&cached.expires>Date.now())return Response.json({assets:cached.assets,cached:true});
@@ -29,6 +31,7 @@ export async function GET(request:Request){
 }
 export async function POST(request:Request){
   const denied=authorize(request);if(denied)return denied;
+  if(principal(request)!.role!=='operator'&&process.env.CALBOK_USER_PROVIDER_ACCESS!=='true')return Response.json({error:'Provider checks are not enabled for member accounts yet.'},{status:403});
   if(rateLimit())return Response.json({error:'Verification budget reached. Retry in one minute.'},{status:429});
   try{
     const input=z.object({asset:z.string().refine(isAllowedAsset)}).parse(await body(request));

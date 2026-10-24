@@ -4,13 +4,13 @@
 
 [GitHub repository](https://github.com/0xileri/CALBOK)
 
-A single-operator prediction accountability app: lock prospective market calls, inspect immutable receipts, settle against eligible pricing, and recall prior outcomes as context for later calls.
+A private prediction accountability app: lock prospective market calls, inspect immutable receipts, settle against eligible pricing, and recall prior outcomes as context for later calls.
 
 ## Status
 
-This is a working **single-operator deployment** with live provider checks, not a final hackathon submission. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
+This is a working **private owner deployment with gated account support** with live provider checks, not a final hackathon submission. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
 
-Live workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand guide: [identity and assets](https://calbok.up.railway.app/brand/index.html). Journal APIs require the operator token; the site is not a public multi-user service.
+Live workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand guide: [identity and assets](https://calbok.up.railway.app/brand/index.html). Visitors see a sign-in screen. Journal APIs require a browser session or the existing operator bearer key. Public registration remains closed until email delivery is configured.
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
@@ -63,11 +63,11 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm run build` creates a deployable Node server build; `npm start` serves it on loopback. Keep the SQLite file (`data/calbok.sqlite` by default) on persistent disk and back up its WAL consistently. Serverless ephemeral disks are unsuitable. The Railway deployment uses Node 24, one replica, a persistent SQLite volume at `/data`, a health check, and operator-token authentication. GitHub main deployments are connected. See [Railway operations](docs/railway.md). Multi-user access still requires tenant authentication/authorization and shared storage, rate limits, and worker infrastructure.
+`npm run build` creates a deployable Node server build; `npm start` serves it on loopback. Keep the SQLite file (`data/calbok.sqlite` by default) on persistent disk and back up its WAL consistently. Serverless ephemeral disks are unsuitable. The Railway deployment uses Node 24, one replica, a persistent SQLite volume at `/data`, a health check, and operator-token authentication. GitHub main deployments are connected. See [Railway operations](docs/railway.md). Before public rollout, configure and verify email delivery, review capacity and provider-cost limits, and explicitly enable account registration and member provider access. Sessions and ownership are stored on the persistent SQLite volume.
 
 ## Design boundaries
 
-- Single-operator private journal; caller names are labels, not authenticated public identities. No public reputation rankings.
+- Private owner journal with per-account receipt ownership and scoped APIs. Email verification authenticates an account, not the caller labels on receipts. Public signup and member provider operations are disabled by default. No public reputation rankings.
 - Only directional 24-hour/7-day prospective calls; target calls, retrospective imports, disputes, X API verification, and automatic extraction are not implemented.
 - The searchable catalog includes all 439 symbols from Tatum's official OHLCV schema, plus live GMGN token search. Provider listing or discovery is **not a promise of validated historical coverage**. Use the selected asset's **Verify historical pricing sample** button; entry/exit timestamps are independently checked again at settlement. Production acceptance should enforce coverage requirements for the relevant window.
 - Structured fields are the scoring contract; prose is preserved as untrusted data and is never executed or interpreted by an LLM. The author must resolve contradictory prose before submitting.
@@ -103,3 +103,13 @@ See [architecture](docs/architecture.md), [scoring](docs/scoring.md), and [actua
 ## Official integration references
 
 [Tatum OHLCV](https://docs.tatum.io/reference/getsymbolohlcv), [Tatum Sui RPC](https://docs.tatum.io/reference/rpc-sui), [Walrus SDK usage](https://docs.wal.app/walrus-memory/sdk/usage/memwal), [Walrus SDK API](https://docs.wal.app/walrus-memory/sdk/api-reference). Documentation checked 24 October 2026. See the evidence files above for verified reads; Mainnet memory writes remain pending.
+
+## Sign-in and account boundaries
+
+The public root shows a branded sign-in screen instead of an operator-token error. The existing owner can open **Workspace owner access**, enter the existing admin key once, and start a seven-day session. Browser credentials are in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS), not localStorage. Sign out revokes the server session. Existing bearer-key API clients continue to work. Local loopback development without an admin key remains available.
+
+Email-code login is implemented but stays unavailable until `RESEND_API_KEY`, `CALBOK_EMAIL_FROM` (a verified sender), and `CALBOK_OWNER_EMAIL` are set. `CALBOK_SESSION_SECRET` is an optional separate random 32+ character code-hashing secret; otherwise the strong admin key is used. Codes expire in 10 minutes, permit five attempts, and work once. Only HMAC code digests and session-token hashes are stored. Email requests have durable per-address and global hourly budgets. No code is printed to logs or returned to the browser. Delivery is not live-verified while email is unconfigured.
+
+`CALBOK_PUBLIC_SIGNIN_ENABLED=false` keeps email login owner-only. `CALBOK_USER_PROVIDER_ACCESS=false` blocks member provider actions and automatic member settlement; changing it may incur provider costs. Enabling either is a deliberate deployment setting, not something the sign-in UI does. New accounts get separate journals. Legacy records stay owned by `operator`; ownership is an additive immutable mapping, preserving original snapshots and hashes. Receipt reads, actions, memory ledgers and recall history resolve within the authenticated owner. Member memory namespaces include the account ID. Worker processing remains internal, with member eligibility gated by provider access.
+
+JSON/CSV exports contain only the signed-in account's journal. Public receipt pages and account import are not implemented. A direct receipt link still requires access to the owning account. Database backups should include sessions, accounts and ownership tables; never share the database publicly.

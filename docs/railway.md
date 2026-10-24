@@ -15,3 +15,11 @@ The loop runs once a minute, processes at most three due receipts, and requests 
 Job state, next retry, attempts, sanitized error codes, and a worker heartbeat are visible in Integration settings and receipt details. Status refreshes every 30 seconds while the browser is visible. The UI displays the latest 100 jobs; the worker processes the full queue. Each job has a two-minute lease; an abandoned job can be recovered after expiry. Settlement, job completion, and its audit event commit together. Manual and automatic settlement share the same lease and immutable outcome contract.
 
 Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. The loop does not write or recall Walrus memories. Those actions remain manual. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
+
+## Browser sign-in
+
+Owner browser login uses the existing `CALBOK_ADMIN_TOKEN` under Workspace owner access and creates an HttpOnly seven-day session cookie. Sign out revokes that session; bearer API clients remain supported. Keep the admin key private. No new Railway secret is required for owner login.
+
+Email code delivery is unavailable until you configure `RESEND_API_KEY`, `CALBOK_EMAIL_FROM` using a verified sending domain, and `CALBOK_OWNER_EMAIL`. Optionally use a separate random `CALBOK_SESSION_SECRET` (32+ characters). Leave `CALBOK_PUBLIC_SIGNIN_ENABLED=false` and `CALBOK_USER_PROVIDER_ACCESS=false` until real email delivery and provider-cost limits are reviewed. No signup or paid member operations are automatically enabled by this release. Test owner email before opening signup; test a second account's isolated workspace before enabling member providers.
+
+Schema additions are additive: `prediction_owners`, `accounts`, `sessions`, `login_codes`, and `login_limits`. Existing predictions remain assigned to the operator without rewriting their immutable snapshots. The same persistent volume is required. Rotating the admin key changes owner-key login and the fallback code-hashing secret; existing sessions must be revoked explicitly if compromise is suspected.
