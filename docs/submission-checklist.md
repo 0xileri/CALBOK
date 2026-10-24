@@ -11,7 +11,7 @@ As of 24 October 2026 this is a deployed single-operator workspace, not a final 
 | Walrus Mainnet remember → done → recall | Authenticated recall PASS; completed writes and write/recall round trip pending |
 | 10 completed Mainnet memories | 0; blocked |
 | Replayable adaptation from genuine evidence | Deterministic policy tested; live demonstration pending |
-| Durable unattended worker | Not implemented; manual operator actions only |
+| Durable unattended worker | Settlement queue implemented with leases, retries, heartbeat and bounded batches; automated failure/recovery tests. Walrus writes remain manual. A genuine call still needs to reach its deadline for live settlement proof |
 | Hosted single-operator deployment | Railway live at https://calbok.up.railway.app/; protected journal APIs, persistent volume, health check, GitHub deployments. Multi-user tenant access remains unimplemented |
 | Published blog / public repository | Initial source shipped to private 0xileri/CALBOK; public visibility and blog remain pending |
 | 2–3 minute demo video | Pending; script outline present |

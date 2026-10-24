@@ -10,7 +10,7 @@ export function db() {
   const path = resolve(/* turbopackIgnore: true */ process.env.CALBOK_DB_PATH || './data/calbok.sqlite');
   mkdirSync(dirname(path),{recursive:true});
   instance = new DatabaseSync(path);
-  instance.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+  instance.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, symbol TEXT NOT NULL, name TEXT NOT NULL, provider TEXT NOT NULL, chain TEXT, address TEXT, discovered_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS asset_checks (id TEXT PRIMARY KEY, asset_id TEXT NOT NULL, checked_at TEXT NOT NULL, evidence TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS predictions (
@@ -28,6 +28,14 @@ export function db() {
       id TEXT PRIMARY KEY, asset TEXT NOT NULL, method TEXT NOT NULL, evidence TEXT NOT NULL, verified_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS audit_events (
       id TEXT PRIMARY KEY, entity_id TEXT NOT NULL, action TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS settlement_jobs (
+      prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), status TEXT NOT NULL DEFAULT 'queued',
+      attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, lease_token TEXT, lease_until TEXT,
+      last_error TEXT, updated_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS settlement_jobs_due ON settlement_jobs(status,next_attempt_at);
+    CREATE TABLE IF NOT EXISTS worker_state (
+      id INTEGER PRIMARY KEY CHECK(id=1), owner TEXT, lease_until TEXT, next_tick_at TEXT NOT NULL,
+      heartbeat_at TEXT, last_error TEXT);
     CREATE TRIGGER IF NOT EXISTS freeze_prediction BEFORE UPDATE ON predictions BEGIN SELECT RAISE(ABORT,'Locked predictions are immutable'); END;
     CREATE TRIGGER IF NOT EXISTS freeze_settlement BEFORE UPDATE ON settlements BEGIN SELECT RAISE(ABORT,'Settlements are immutable'); END;`);
   return instance;
@@ -48,6 +56,7 @@ export function capture(claim:Claim) {
   try {
     database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,claim.caller,claim.asset,claim.direction,claim.horizon,claim.text,claim.sourceUrl,now.toISOString(),deadline,fingerprint,hash(snapshot),'self_logged_before_outcome',snapshot);
     database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_locked',hash(snapshot),now.toISOString());
+    database.prepare('INSERT INTO settlement_jobs (prediction_id,next_attempt_at,updated_at) VALUES (?,?,?)').run(id,new Date(Date.parse(deadline)+60_000).toISOString(),now.toISOString());
     database.exec('COMMIT'); return id;
   } catch(error) { database.exec('ROLLBACK'); throw error; }
 }

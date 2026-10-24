@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { authorize, body, rateLimit } from '@/lib/http';
 import { db, listReceipts } from '@/lib/db';
-import { METHOD, settle, warning } from '@/lib/domain';
-import { memoryClient, namespaceFor, assetCandles, ProviderError, suiMetadata } from '@/lib/providers';
-import {parseGmgnAssetId} from '@/lib/assets';
+import { warning } from '@/lib/domain';
+import { memoryClient, namespaceFor, ProviderError, suiMetadata } from '@/lib/providers';
+import {runSettlement} from '@/lib/settlement-worker';
 export const runtime='nodejs';
 export async function POST(request:Request) {
   const denied=authorize(request);if(denied)return denied;
@@ -17,16 +17,7 @@ export async function POST(request:Request) {
     }
     const receipt=listReceipts().find(r=>r.id===input.id);
     if(!receipt)return Response.json({error:'Receipt not found.'},{status:404});
-    if(input.action==='settle') {
-      if(receipt.outcome)return Response.json({message:'This receipt already has an immutable settlement.'});
-      const start=Date.parse(receipt.locked_at),deadline=Date.parse(receipt.deadline);
-      if(Date.now()<deadline+60_000)return Response.json({message:'Pending: the deadline and exit candle have not finalized.'});
-      const candles=(await Promise.all([assetCandles(receipt.asset,start),assetCandles(receipt.asset,deadline)])).flat();
-      const result=settle(receipt.direction as 'bullish'|'bearish',start,deadline,candles,Date.now());
-      // Missing coverage may be retried; never freeze transient provider absence.
-      if(['won','lost','neutral'].includes(result.outcome))db().prepare('INSERT OR IGNORE INTO settlements VALUES (?,?,?,?,?)').run(receipt.id,result.outcome,JSON.stringify({...result,provider:parseGmgnAssetId(receipt.asset)?'GMGN':'Tatum',asset:receipt.asset}),METHOD,new Date().toISOString());
-      return Response.json({message:result.reason,result});
-    }
+    if(input.action==='settle') return Response.json(await runSettlement(receipt.id,{force:true}));
     const namespace=namespaceFor(receipt.caller),client=await memoryClient(namespace);
     if(input.action==='remember') {
       if(!['won','lost','neutral'].includes(receipt.outcome || ''))return Response.json({error:'A verified settled receipt is required.'},{status:409});

@@ -1,12 +1,13 @@
 import { authorize, body, rateLimit } from '@/lib/http';
 import { capture, db, listReceipts,knownAsset } from '@/lib/db';
 import {parseGmgnAssetId} from '@/lib/assets';
+import {settlementStatus} from '@/lib/settlement-worker';
 import { claimSchema } from '@/lib/domain';
 import { configuration } from '@/lib/providers';
 export const runtime='nodejs';
 export async function GET(request:Request) {
   const denied=authorize(request);if(denied)return denied;
-  return Response.json({receipts:listReceipts(),memoryJobs:db().prepare('SELECT * FROM memory_jobs').all(),onchain:db().prepare('SELECT * FROM onchain_evidence').all(),providers:configuration()},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({receipts:listReceipts(),settlement:settlementStatus(),memoryJobs:db().prepare('SELECT * FROM memory_jobs').all(),onchain:db().prepare('SELECT * FROM onchain_evidence').all(),providers:configuration()},{headers:{'Cache-Control':'no-store'}});
 }
 export async function POST(request:Request) {
   const denied=authorize(request);if(denied)return denied;

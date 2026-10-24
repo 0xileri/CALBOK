@@ -12,6 +12,7 @@
 !package.json
 !package-lock.json
 !next.config.ts
+!instrumentation.ts
 !next-env.d.ts
 !tsconfig.json
 !Dockerfile

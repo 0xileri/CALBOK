@@ -1,0 +1,89 @@
+import {randomUUID} from 'node:crypto';
+import {db,hash,listReceipts} from './db';
+import {METHOD,settle,type Candle} from './domain';
+import {assetCandles,ProviderError} from './providers';
+import {parseGmgnAssetId} from './assets';
+
+const LEASE_MS=120_000,MAX_ATTEMPTS=8;
+export type SettlementJob={prediction_id:string;status:string;attempts:number;next_attempt_at:string;lease_until:string|null;last_error:string|null;updated_at:string};
+type Options={force?:boolean;clock?:()=>number;fetchCandles?:(asset:string,boundary:number)=>Promise<Candle[]>};
+export function syncSettlementJobs(now=Date.now()) {
+  db().prepare(`INSERT OR IGNORE INTO settlement_jobs(prediction_id,next_attempt_at,updated_at)
+    SELECT p.id,strftime('%Y-%m-%dT%H:%M:%fZ',p.deadline,'+1 minute'),? FROM predictions p
+    LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL`).run(new Date(now).toISOString());
+  db().prepare(`UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=?
+    WHERE status!='done' AND EXISTS(SELECT 1 FROM settlements s WHERE s.prediction_id=settlement_jobs.prediction_id)`).run(new Date(now).toISOString());
+}
+export async function runSettlement(id:string,{force=false,clock=Date.now,fetchCandles=assetCandles}:Options={}):Promise<{message:string;error?:string;result?:ReturnType<typeof settle>}> {
+  const receipt=listReceipts().find(row=>row.id===id);
+  if(!receipt)return {message:'Receipt not found.'};
+  const now=clock(),iso=new Date(now).toISOString();
+  if(receipt.outcome){db().prepare("UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=? WHERE prediction_id=?").run(iso,id);return {message:'This receipt already has an immutable settlement.'};}
+  if(now<Date.parse(receipt.deadline)+60_000)return {message:'Pending: the deadline and exit candle have not finalized.'};
+  syncSettlementJobs(now);
+  const token=randomUUID();
+  const job=db().prepare(`UPDATE settlement_jobs SET status='running',attempts=CASE WHEN status='paused' THEN 1 ELSE attempts+1 END,
+    lease_token=?,lease_until=?,updated_at=? WHERE prediction_id=? AND (lease_until IS NULL OR lease_until<=?)
+    AND (?=1 OR (status IN ('queued','retry','running') AND next_attempt_at<=?)) RETURNING attempts`).get(token,new Date(now+LEASE_MS).toISOString(),iso,id,iso,force?1:0,iso) as {attempts:number}|undefined;
+  if(!job)return {message:'Settlement is already running, awaiting its next retry, or paused for review.'};
+  function defer(code:string) {
+    const time=clock(),paused=job!.attempts>=MAX_ATTEMPTS;
+    db().prepare(`UPDATE settlement_jobs SET status=?,next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error=?,updated_at=?
+      WHERE prediction_id=? AND lease_token=?`).run(paused?'paused':'retry',new Date(time+Math.min(3600_000,60_000*2**(job!.attempts-1))).toISOString(),code,new Date(time).toISOString(),id,token);
+    return {message:paused?'Settlement paused after repeated failures. Check provider coverage, then retry manually.':'Evidence unavailable. A retry has been scheduled.',error:code};
+  }
+  try {
+    const candles=(await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))])).flat();
+    const result=settle(receipt.direction as 'bullish'|'bearish',Date.parse(receipt.locked_at),Date.parse(receipt.deadline),candles,clock());
+    if(!['won','lost','neutral'].includes(result.outcome))return defer('PRICE_COVERAGE_UNAVAILABLE');
+    const database=db(),completed=new Date(clock()).toISOString();
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const owned=database.prepare('SELECT prediction_id FROM settlement_jobs WHERE prediction_id=? AND lease_token=? AND lease_until>?').get(id,token,completed);
+      if(!owned){database.exec('ROLLBACK');return {message:'Settlement lease expired; the queued job will be recovered.'};}
+      const evidence=JSON.stringify({...result,provider:parseGmgnAssetId(receipt.asset)?'GMGN':'Tatum',asset:receipt.asset});
+      const inserted=database.prepare('INSERT OR IGNORE INTO settlements VALUES (?,?,?,?,?)').run(id,result.outcome,evidence,METHOD,completed);
+      if(inserted.changes)database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_settled',hash(evidence),completed);
+      database.prepare("UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=? WHERE prediction_id=? AND lease_token=?").run(completed,id,token);
+      database.exec('COMMIT');
+    } catch(error){database.exec('ROLLBACK');throw error;}
+    return {message:result.reason,result};
+  } catch(error) {
+    const code=error instanceof ProviderError && /^[A-Z][A-Z0-9_]{0,80}$/.test(error.code)?error.code:'SETTLEMENT_PROVIDER_UNAVAILABLE';
+    return defer(code);
+  }
+}
+
+export function settlementStatus() {
+  const database=db();
+  const heartbeat=database.prepare('SELECT heartbeat_at,last_error FROM worker_state WHERE id=1').get() as {heartbeat_at:string|null;last_error:string|null}|undefined;
+  return {healthy:!!heartbeat?.heartbeat_at && Date.now()-Date.parse(heartbeat.heartbeat_at)<180_000,enabled:process.env.CALBOK_WORKER_ENABLED==='true',heartbeat:heartbeat||null,
+    jobs:database.prepare('SELECT prediction_id,status,attempts,next_attempt_at,lease_until,last_error,updated_at FROM settlement_jobs ORDER BY updated_at DESC LIMIT 100').all() as unknown as SettlementJob[]};
+}
+
+export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Options={}) {
+  const now=clock(),iso=new Date(now).toISOString(),owner=randomUUID(),database=db();
+  database.prepare("INSERT OR IGNORE INTO worker_state(id,next_tick_at) VALUES (1,'1970-01-01T00:00:00.000Z')").run();
+  const leader=database.prepare(`UPDATE worker_state SET owner=?,lease_until=?,next_tick_at=?,heartbeat_at=?,last_error=NULL
+    WHERE id=1 AND (lease_until IS NULL OR lease_until<=?) AND next_tick_at<=? RETURNING id`).get(owner,new Date(now+LEASE_MS).toISOString(),new Date(now+60_000).toISOString(),iso,iso,iso);
+  if(!leader)return;
+  try {
+    syncSettlementJobs(now);
+    const due=database.prepare(`SELECT j.prediction_id FROM settlement_jobs j JOIN predictions p ON p.id=j.prediction_id
+      LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND j.status IN ('queued','retry','running')
+      AND j.next_attempt_at<=? AND (j.lease_until IS NULL OR j.lease_until<=?)
+      AND p.deadline<=? ORDER BY j.next_attempt_at LIMIT 3`).all(iso,iso,new Date(now-60_000).toISOString()) as {prediction_id:string}[];
+    for(const job of due)await runSettlement(job.prediction_id,{clock,fetchCandles});
+  } catch {database.prepare("UPDATE worker_state SET last_error='WORKER_TICK_FAILED' WHERE id=1 AND owner=?").run(owner);}
+  finally {database.prepare('UPDATE worker_state SET heartbeat_at=?,lease_until=NULL,owner=NULL WHERE id=1 AND owner=?').run(new Date(clock()).toISOString(),owner);}
+}
+
+export function startSettlementWorker() {
+  const shared=globalThis as typeof globalThis & {calbokSettlementWorker?:ReturnType<typeof setInterval>};
+  if(shared.calbokSettlementWorker)return;
+  let running=false;
+  const tick=async()=>{if(running)return;running=true;try{await workerTick();}catch{console.error('Settlement worker tick failed.');}finally{running=false;}};
+  shared.calbokSettlementWorker=setInterval(()=>void tick(),60_000);
+  shared.calbokSettlementWorker.unref();
+  void tick();
+}
