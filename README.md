@@ -38,6 +38,12 @@ Open [CALBOK](http://127.0.0.1:3000). No account or provider key is needed to lo
 4. After the deadline, use **Check settlement**. Missing credentials/coverage remain explicit errors; no result is invented.
 5. Once settled, use **Remember outcome**, then **Check context**. Only a completed job with a blob ID counts as a memory.
 
+## Journal portability and memory inspection
+
+Call receipts support exact-market, direction, horizon and outcome filters, plus lock-time or deadline sorting. Export all receipts, the filtered selection, or a single receipt as versioned JSON. Exports retain original evidence strings and snapshot hashes and exclude runtime credentials, provider settings and memory contents. These files are private data exports, not independent verification or full SQLite backups; import is not implemented.
+
+The memory ledger separates confirmed completion (done plus blob ID), pending completion, uncertain acceptance and jobs needing attention. Filters and search inspect existing jobs without creating paid writes. Receipt actions remain the way to inspect or recheck a job. Overview win rates use the same reproducible-evidence checks as caller profiles.
+
 ## Configure integrations
 
 Set `TATUM_API_KEY`, `MEMWAL_PRIVATE_KEY`, and `MEMWAL_ACCOUNT_ID`. For onchain token search, add `GMGN_API_KEY` inside `.env.local` (this is a file entry, not a PowerShell command). `MEMWAL_ACCOUNT_ID` is the account object, not the delegate's public agent ID. An optional `MEMWAL_SERVER_URL` selects a trusted relayer. Set `MEMWAL_NETWORK=mainnet` only after verifying that account/relayer configuration actually targets Mainnet; this flag is an operator attestation, not network proof.
