@@ -76,6 +76,11 @@ label{font-size:11px;font-weight:600}label>span{color:#6b7d5b}label>input,label>
 @media(max-width:360px){.hero h2{font-size:46px}.hero{padding:25px 20px}.hero p{font-size:10px}.receipt-art{transform:scale(.52)}.wheel-node{padding:8px 6px}.wheel-node b{font-size:6px}.wheel-legend{grid-template-columns:1fr}}
 
 .mobile-brand{display:none}
+.page-content.section-leaving{opacity:0;transform:translateY(-7px);transition:opacity 140ms ease,transform 140ms ease;pointer-events:none}
+.page-content.section-entering{animation:section-arrive 280ms cubic-bezier(.2,.7,.2,1) both}
+@keyframes section-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.nav-item{transition:background 180ms ease,color 180ms ease,box-shadow 180ms ease}
+@media(prefers-reduced-motion:reduce){.page-content.section-leaving,.page-content.section-entering{opacity:1;transform:none;animation:none;transition:none}}
 .headline-motion{position:relative;width:fit-content;max-width:100%}
 .hero .glass-headline{perspective:650px;position:relative;isolation:isolate}
 .glass-word{position:relative;display:block;width:fit-content;white-space:nowrap}
