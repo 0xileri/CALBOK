@@ -1,0 +1,31 @@
+'use client';
+import {useState} from 'react';
+import {Check,ChevronDown,LoaderCircle,Search,ShieldCheck,X} from 'lucide-react';
+import {GMGN_CHAINS,TATUM_CATALOG,tatumAssets,type Asset} from '@/lib/assets';
+import './asset-picker.css';
+export function AssetPicker({headers,onSelected,gmgnConfigured}:{headers:()=>HeadersInit;onSelected:(asset:Asset|null)=>void;gmgnConfigured:boolean}){
+  const [provider,setProvider]=useState<'Tatum'|'GMGN'>('Tatum'),[query,setQuery]=useState(''),[chain,setChain]=useState('all'),[results,setResults]=useState<Asset[]>([]),[selected,setSelected]=useState<Asset|null>(null),[busy,setBusy]=useState(''),[error,setError]=useState(''),[proof,setProof]=useState(''),[searched,setSearched]=useState(false),[expanded,setExpanded]=useState(false);
+  const listed=provider==='Tatum'?tatumAssets(query):results;
+  function resetSelection(){setSelected(null);onSelected(null);setProof('');setError('');}
+  async function search(){
+    if(query.trim().length<2){setError('Enter at least two characters or a contract address.');return;}
+    setBusy('search');setError('');setResults([]);setSearched(true);
+    try{const url=new URL('/api/assets',window.location.origin);url.search=new URLSearchParams({q:query.trim(),provider:'GMGN',chain}).toString();const res=await fetch(url,{headers:headers()});const data=await res.json();if(!res.ok)throw new Error(data.error);setResults(data.assets);}catch(e){setError(e instanceof Error?e.message:'Token search unavailable.');}finally{setBusy('');}
+  }
+  function choose(asset:Asset){setSelected(asset);onSelected(asset);setProof('');setError('');setExpanded(false);}
+  async function verify(){
+    if(!selected)return;setBusy('verify');setError('');setProof('');
+    try{const res=await fetch('/api/assets',{method:'POST',headers:headers(),body:JSON.stringify({asset:selected.id})});const data=await res.json();if(!res.ok)throw new Error(data.error);setProof(`Verified ${new Date(data.evidence.candle.openTime).toUTCString()} · ${selected.provider} 1m candle. Future settlement coverage is checked separately.`);}catch(e){setError(e instanceof Error?e.message:'Historical sample unavailable.');}finally{setBusy('');}
+  }
+  return <fieldset className="asset-picker" disabled={!!busy}><legend>Asset <span>Choose the exact market</span></legend><input type="hidden" name="asset" value={selected?.id||''}/>
+    <button type="button" className="asset-picker-toggle" disabled={!!busy} aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}><span>{selected?<><strong>{selected.symbol}</strong> · {selected.provider}{selected.chain?` · ${selected.chain}`:''}</>:'Search available coins or contract addresses'}</span><ChevronDown size={15}/></button>
+    {expanded&&<div className="asset-picker-body"><div className="asset-provider-tabs" role="group" aria-label="Asset provider">{(['Tatum','GMGN'] as const).map(p=><button key={p} type="button" aria-pressed={provider===p} className={provider===p?'chosen':''} onClick={()=>{resetSelection();setProvider(p);setResults([]);setSearched(false);}}>{p}{p==='Tatum'?` · ${TATUM_CATALOG.count}`:' · onchain tokens'}</button>)}</div>
+      <div className="asset-search-row"><label className="asset-search-field"><Search size={14}/><input aria-label="Search coins" value={query} placeholder={provider==='Tatum'?'Search 439 symbols, e.g. SOL':'Symbol, name, or contract address'} onChange={e=>{setQuery(e.target.value);if(provider==='GMGN'){setResults([]);setSearched(false);}}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(provider==='GMGN')void search();}}}/></label>{provider==='GMGN'&&<button type="button" className="button secondary" onClick={()=>void search()} disabled={!!busy||!gmgnConfigured}>{busy==='search'?<LoaderCircle size={14} className="spin"/>:'Search'}</button>}</div>
+      {provider==='GMGN'&&<label className="asset-chain-label">Chain<select aria-label="Token chain" value={chain} onChange={e=>{resetSelection();setChain(e.target.value);setResults([]);setSearched(false);}}><option value="all">All GMGN search chains</option>{GMGN_CHAINS.map(c=><option key={c} value={c}>{c}</option>)}</select></label>}
+      {provider==='GMGN'&&!gmgnConfigured&&<p className="asset-picker-hint">GMGN is not configured. Save GMGN_API_KEY in .env.local, then reopen this form or refresh the page.</p>}
+      <div className="asset-results" role="group" aria-label="Available markets">{listed.map(asset=><button type="button" className="asset-option" key={asset.id} onClick={()=>choose(asset)}><span><strong>{asset.symbol}</strong><small>{asset.name}{asset.chain?` · ${asset.chain}`:''}</small>{asset.address&&<code>{asset.address}</code>}</span>{selected?.id===asset.id?<Check size={15}/>:<span className="asset-option-provider">{asset.provider}</span>}</button>)}{!listed.length&&<p className="asset-picker-hint">{provider==='Tatum'?'No Tatum symbol matches. Try GMGN for chain-specific tokens.':searched&&!busy?'No matching tokens returned. Try the exact contract address.':'Enter a query and press Search to load live tokens.'}</p>}</div>
+      <p className="asset-picker-hint">{provider==='Tatum'?'Provider-listed markets, not a guarantee of historical coverage.':'Token symbols can repeat. Confirm the chain and contract address. Search results are untrusted provider metadata.'}</p></div>}
+    {selected&&<div className="asset-selected"><div><span className="badge">{selected.provider}{selected.chain?` · ${selected.chain}`:''}</span><strong>{selected.symbol}</strong>{selected.address&&<code>{selected.address}</code>}<button type="button" className="asset-clear" aria-label="Clear asset selection" onClick={()=>{resetSelection();setExpanded(true);}}><X size={13}/></button></div><button type="button" className="text-button" disabled={!!busy} onClick={()=>void verify()}>{busy==='verify'?<LoaderCircle size={13} className="spin"/>:<ShieldCheck size={13}/>}Verify historical pricing sample</button></div>}
+    {error&&<p className="asset-error" role="alert">{error}</p>}{proof&&<p className="asset-proof" role="status">{proof}</p>}
+  </fieldset>;
+}

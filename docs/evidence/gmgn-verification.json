@@ -1,0 +1,23 @@
+{
+  "provider": "GMGN",
+  "checkedAt": "2026-10-24T15:44:08.790Z",
+  "asset": {
+    "id": "gmgn:base:0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf",
+    "chain": "base",
+    "address": "0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf",
+    "symbol": "VVV",
+    "name": "Venice Token",
+    "provider": "GMGN",
+    "discoveredAt": "2026-10-24T15:44:08.425Z"
+  },
+  "requestedBoundary": 1792853040000,
+  "candle": {
+    "openTime": 1792853040000,
+    "closeTime": 1792853100000,
+    "open": "23.95532954",
+    "high": "23.98930058",
+    "low": "23.95529107",
+    "close": "23.95553506",
+    "hash": "ab24559a1f476300c58ecd7803add30337fcba5b7789e4b7267b0325ac39a2c8"
+  }
+}

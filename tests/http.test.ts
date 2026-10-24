@@ -4,6 +4,8 @@ import { authorize, body } from '../lib/http';
 test('local guard rejects cross-origin and non-loopback access',()=>{
   delete process.env.CALBOK_ADMIN_TOKEN;
   assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'localhost:3000'}})),undefined);
+  assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'127.0.0.1:3000',origin:'http://127.0.0.1:3000'}})),undefined);
+  assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'127.0.0.1:3000',origin:'http://localhost:3000'}}))?.status,403);
   assert.equal(authorize(new Request('http://evil.example/api',{headers:{host:'evil.example'}}))?.status,403);
   assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'localhost:3000',origin:'https://evil.example'}}))?.status,403);
 });

@@ -1,0 +1,15 @@
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {z} from 'zod';
+const source='https://docs.tatum.io/reference/getsymbolohlcv';
+const response=await fetch(source,{signal:AbortSignal.timeout(25_000)});
+if(!response.ok)throw new Error(`Catalog documentation HTTP ${response.status}`);
+const html=await response.text();
+const match=html.match(/<script id="ssr-props"[^>]*>([\s\S]*?)<\/script>/);
+if(!match)throw new Error('Official catalog schema not found; existing catalog was not changed.');
+const props=JSON.parse(match[1]);
+const symbols=z.array(z.string().min(1).max(40)).min(3).parse(props.document?.api?.schema?.components?.schemas?.HistoricalPriceSymbol?.enum);
+if(!['BTC','ETH','SUI'].every(s=>symbols.includes(s)))throw new Error('Catalog missing baseline markets; existing catalog was not changed.');
+const catalog={source,checkedAt:new Date().toISOString(),symbols:[...new Set(symbols)].sort()};
+mkdirSync('lib/catalog',{recursive:true});
+writeFileSync('lib/catalog/tatum-symbols.json',JSON.stringify(catalog,null,2)+'\n');
+console.log(`Synced ${catalog.symbols.length} documented Tatum symbols. This is listing coverage, not proof of every historical candle.`);

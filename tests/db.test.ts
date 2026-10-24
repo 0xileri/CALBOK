@@ -6,7 +6,7 @@ import {join,resolve,sep} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 const directory=mkdtempSync(join(tmpdir(),'calbok-test-'));
 process.env.CALBOK_DB_PATH=join(directory,'test.sqlite');
-const {capture,db,hash,listReceipts}=await import('../lib/db');
+const {capture,db,hash,listReceipts,registerAsset}=await import('../lib/db');
 test('SQL receipt capture, immutable snapshot, duplicates, and independent connection persistence',()=>{
   try{
     const claim={caller:'Unit test only',text:'Synthetic test BTC higher in 24h',asset:'BTC' as const,direction:'bullish' as const,horizon:'24h' as const,sourceUrl:''};
@@ -23,5 +23,12 @@ test('SQL receipt capture, immutable snapshot, duplicates, and independent conne
     db().prepare('INSERT INTO settlements VALUES (?,?,?,?,?)').run(id,'won','{"fixture":true}','unit-test',new Date().toISOString());
     assert.throws(()=>db().prepare('UPDATE settlements SET outcome=? WHERE prediction_id=?').run('lost',id),/immutable/);
     assert.equal(listReceipts()[0].outcome,'won');
+    const gmgnId='gmgn:base:0x'+'a'.repeat(40);
+    assert.throws(()=>capture({...claim,asset:gmgnId}),/discovered and selected first/);
+    registerAsset({id:gmgnId,symbol:'TEST',name:'Synthetic test only',provider:'GMGN',chain:'base',address:'0x'+'a'.repeat(40)});
+    const tokenReceiptId=capture({...claim,asset:gmgnId});
+    assert.equal(listReceipts().find(r=>r.id===tokenReceiptId)?.asset_symbol,'TEST');
+    const tokenSnapshot=db().prepare('SELECT snapshot FROM predictions WHERE id=?').get(tokenReceiptId) as {snapshot:string};
+    assert.equal(JSON.parse(tokenSnapshot.snapshot).assetMetadata.provider,'GMGN');
   }finally{db().close();assert.ok(resolve(directory).startsWith(resolve(tmpdir())+sep));rmSync(directory,{recursive:true,force:true});}
 });

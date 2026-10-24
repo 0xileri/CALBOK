@@ -1,5 +1,6 @@
 import { authorize, body, rateLimit } from '@/lib/http';
-import { capture, db, listReceipts } from '@/lib/db';
+import { capture, db, listReceipts,knownAsset } from '@/lib/db';
+import {parseGmgnAssetId} from '@/lib/assets';
 import { claimSchema } from '@/lib/domain';
 import { configuration } from '@/lib/providers';
 export const runtime='nodejs';
@@ -13,6 +14,7 @@ export async function POST(request:Request) {
   try {
     const parsed=claimSchema.safeParse(await body(request));
     if(!parsed.success)return Response.json({error:parsed.error.issues.map(i=>i.message).join(' ')},{status:400});
+    if(parseGmgnAssetId(parsed.data.asset)&&!knownAsset(parsed.data.asset))return Response.json({error:'Search for and select this GMGN token first so its identity can be preserved.'},{status:400});
     const id=capture(parsed.data);return Response.json({id},{status:201});
   } catch(error) {
     const duplicate=error instanceof Error && error.message.includes('UNIQUE');

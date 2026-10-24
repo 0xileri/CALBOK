@@ -3,7 +3,10 @@ export function authorize(request:Request) {
   const token = process.env.CALBOK_ADMIN_TOKEN;
   const host = request.headers.get('host') || '';
   const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) return Response.json({error:'Cross-origin requests refused.'},{status:403});
+  // Next's internal request URL may say localhost while the browser uses
+  // 127.0.0.1. Compare to the actual Host header, retaining the protocol check.
+  const requestOrigin=`${new URL(request.url).protocol}//${host.toLowerCase()}`;
+  if (origin && origin !== requestOrigin) return Response.json({error:'Cross-origin requests refused.'},{status:403});
   if (token) {
     const supplied = request.headers.get('authorization')?.replace(/^Bearer /,'') || '';
     if (Buffer.byteLength(supplied)!==Buffer.byteLength(token) || !timingSafeEqual(Buffer.from(supplied),Buffer.from(token))) return Response.json({error:'Operator token required.'},{status:401});

@@ -9,7 +9,9 @@
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
     "test": "tsx --test tests/*.test.ts",
-    "providers:verify": "tsx scripts/verify-providers.ts"
+    "providers:verify": "tsx scripts/verify-providers.ts",
+    "assets:sync": "tsx scripts/sync-tatum-catalog.ts",
+    "gmgn:verify": "tsx scripts/verify-gmgn.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "1.14.5",

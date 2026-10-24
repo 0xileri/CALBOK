@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import { hash } from './db';
 import type { Candle } from './domain';
+import {parseGmgnAssetId} from './assets';
+import {gmgnCandles} from './gmgn';
+import {ProviderError} from './provider-error';
+export {ProviderError} from './provider-error';
 
-export class ProviderError extends Error { constructor(public code:string) { super(code); } }
-export function configuration() { return {tatum:!!process.env.TATUM_API_KEY,walrus:!!(process.env.MEMWAL_PRIVATE_KEY && process.env.MEMWAL_ACCOUNT_ID),mainnet:process.env.MEMWAL_NETWORK==='mainnet'}; }
+export function configuration() { return {tatum:!!process.env.TATUM_API_KEY,gmgn:!!process.env.GMGN_API_KEY,walrus:!!(process.env.MEMWAL_PRIVATE_KEY && process.env.MEMWAL_ACCOUNT_ID),mainnet:process.env.MEMWAL_NETWORK==='mainnet'}; }
 async function tatum(url:string, body?:unknown) {
   if (!process.env.TATUM_API_KEY) throw new ProviderError('TATUM_NOT_CONFIGURED');
   const response = await fetch(url,{method:body?'POST':'GET',headers:{'x-api-key':process.env.TATUM_API_KEY,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15_000),cache:'no-store'});
@@ -41,6 +44,10 @@ export async function priceCandle(asset:string, boundary:number):Promise<Candle>
   // Tatum's live 1m response uses an inclusive final millisecond (duration 59,999).
   // Normalize only this exact convention and retain the raw boundary for audits.
   return normalizeTatumCandle(raw);
+}
+export async function assetCandles(asset:string,boundary:number):Promise<Candle[]> {
+  const token=parseGmgnAssetId(asset);
+  return token?gmgnCandles(token.chain,token.address,boundary):[await priceCandle(asset,boundary)];
 }
 export async function memoryClient(namespace:string) {
   if (!configuration().walrus || !configuration().mainnet) throw new ProviderError('WALRUS_MAINNET_NOT_CONFIGURED');
