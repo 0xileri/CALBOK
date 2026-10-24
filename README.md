@@ -40,7 +40,7 @@ Open [CALBOK](http://127.0.0.1:3000). No account or provider key is needed to lo
 
 ## Journal portability and memory inspection
 
-Call receipts support exact-market, direction, horizon and outcome filters, plus lock-time or deadline sorting. Export all receipts, the filtered selection, or a single receipt as versioned JSON. Exports retain original evidence strings and snapshot hashes and exclude runtime credentials, provider settings and memory contents. These files are private data exports, not independent verification or full SQLite backups; import is not implemented.
+Call receipts support exact-market, direction, horizon and outcome filters, plus lock-time or deadline sorting. Export all receipts, the filtered selection, or a single receipt as versioned JSON. Exports retain original evidence strings and snapshot hashes and exclude runtime credentials, provider settings and memory contents. These files are private data exports, not independent verification or full SQLite backups; import is not implemented. Choose CSV for spreadsheet analysis: UTF-8 output quotes multiline cells and prefixes formula-like text with an apostrophe. CSV omits raw candle JSON; JSON retains original strings and full stored evidence. Receipt links use a URL fragment containing only the record ID and still require operator access. Opening or copying a link does not publish the receipt.
 
 The memory ledger separates confirmed completion (done plus blob ID), pending completion, uncertain acceptance and jobs needing attention. Filters and search inspect existing jobs without creating paid writes. Receipt actions remain the way to inspect or recheck a job. Overview win rates use the same reproducible-evidence checks as caller profiles.
 

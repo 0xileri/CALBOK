@@ -15,3 +15,18 @@ export function downloadJournal(receipts:Receipt[],filename='calbok-journal.json
   const url=URL.createObjectURL(new Blob([JSON.stringify(journalExport(receipts),null,2)],{type:'application/json'}));
   const link=document.createElement('a');link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30_000);
 }
+
+/** Quote every cell and neutralize spreadsheet formulas, including leading control/space characters. */
+export function csvCell(value:unknown) {
+  let text=value===null||value===undefined?'':String(value);
+  if(/^[\s\u0000-\u001f]*[=+@-]/.test(text)||/^[\t\r\n]/.test(text))text="'"+text;
+  return `"${text.replace(/"/g,'""')}"`;
+}
+export function journalCsv(receipts:Receipt[]) {
+  const fields=['id','caller','asset','asset_symbol','asset_provider','direction','horizon','text','source_url','locked_at','deadline','snapshot_hash','provenance','outcome','method'] as const;
+  return '\uFEFF'+[fields.map(csvCell).join(','),...receipts.map(row=>fields.map(field=>csvCell(row[field])).join(','))].join('\r\n');
+}
+export function downloadJournalCsv(receipts:Receipt[],filename='calbok-journal.csv') {
+  const url=URL.createObjectURL(new Blob([journalCsv(receipts)],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30_000);
+}
