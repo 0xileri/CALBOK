@@ -4,13 +4,15 @@
 
 [GitHub repository](https://github.com/0xileri/CALBOK)
 
-A local prediction accountability app: lock prospective market calls, inspect immutable receipts, settle against eligible pricing, and recall prior outcomes as context for later calls.
+A single-operator prediction accountability app: lock prospective market calls, inspect immutable receipts, settle against eligible pricing, and recall prior outcomes as context for later calls.
 
 ## Status
 
-This is a working **local foundation** with live provider checks, not a hackathon-ready release. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
+This is a working **single-operator deployment** with live provider checks, not a final hackathon submission. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
 
-Implemented: responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
+Live workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand guide: [identity and assets](https://calbok.up.railway.app/brand/index.html). Journal APIs require the operator token; the site is not a public multi-user service.
+
+Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
 Provider verification update (24 October 2026): Tatum Sui Mainnet gRPC coin metadata, one timestamp-validated historical BTC candle, Walrus authenticated recall, and GMGN search plus one VVV/Base historical candle now pass with locally configured credentials. See `docs/evidence/provider-verification.json` and `docs/evidence/gmgn-verification.json`. Completed Walrus writes and memory changing a real new-call warning remain release blockers. Other markets need their own coverage checks.
 
@@ -28,7 +30,7 @@ Open [CALBOK](http://127.0.0.1:3000). No account or provider key is needed to lo
 
 1. Log a caller and original text. Search the 439-symbol Tatum catalog or use GMGN to select a token by chain and contract address. Coin, direction and horizon have no silent defaults.
 2. Submit to lock a timestamped structured contract and snapshot hash.
-3. Open the receipt to inspect its ID, UTC timestamps and source link.
+3. Open the receipt to inspect its ID, UTC timestamps and source link. Use **Download PNG** for a branded image, or **Copy summary** for the full text record. PNGs are rendered locally in the browser; the expandable text preview also supports manual copying.
 4. After the deadline, use **Check settlement**. Missing credentials/coverage remain explicit errors; no result is invented.
 5. Once settled, use **Remember outcome**, then **Check context**. Only a completed job with a blob ID counts as a memory.
 
@@ -51,7 +53,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-`npm run build` creates a deployable Node server build; `npm start` serves it on loopback. Keep the SQLite file (`data/calbok.sqlite` by default) on persistent disk and back up its WAL consistently. Serverless ephemeral disks are unsuitable. For public/multi-user hosting, implement tenant authentication/authorization, production rate limiting, versioned migrations, a durable worker, and a PostgreSQL migration before deployment. No public deployment is included.
+`npm run build` creates a deployable Node server build; `npm start` serves it on loopback. Keep the SQLite file (`data/calbok.sqlite` by default) on persistent disk and back up its WAL consistently. Serverless ephemeral disks are unsuitable. The Railway deployment uses Node 24, one replica, a persistent SQLite volume at `/data`, a health check, and operator-token authentication. GitHub main deployments are connected. See [Railway operations](docs/railway.md). Multi-user access still requires tenant authentication/authorization and shared storage, rate limits, and worker infrastructure.
 
 ## Design boundaries
 
@@ -90,4 +92,4 @@ See [architecture](docs/architecture.md), [scoring](docs/scoring.md), and [actua
 
 ## Official integration references
 
-[Tatum OHLCV](https://docs.tatum.io/reference/getsymbolohlcv), [Tatum Sui RPC](https://docs.tatum.io/reference/rpc-sui), [Walrus SDK usage](https://docs.wal.app/walrus-memory/sdk/usage/memwal), [Walrus SDK API](https://docs.wal.app/walrus-memory/sdk/api-reference). Documentation checked 24 October 2026; live provider validation remains pending.
+[Tatum OHLCV](https://docs.tatum.io/reference/getsymbolohlcv), [Tatum Sui RPC](https://docs.tatum.io/reference/rpc-sui), [Walrus SDK usage](https://docs.wal.app/walrus-memory/sdk/usage/memwal), [Walrus SDK API](https://docs.wal.app/walrus-memory/sdk/api-reference). Documentation checked 24 October 2026. See the evidence files above for verified reads; Mainnet memory writes remain pending.
