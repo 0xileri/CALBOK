@@ -14,6 +14,8 @@ Live workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand g
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
+Caller profiles include a searchable directory, performance filters by exact market, horizon and direction, and breakdowns with visible sample sizes. Win rates exclude pending, neutral and unreproducible results; stored candle evidence must reproduce the verdict. Receipt-history search, outcome filters and ordering do not change performance totals. Same-symbol tokens remain separate by chain and contract.
+
 Provider verification update (24 October 2026): Tatum Sui Mainnet gRPC coin metadata, one timestamp-validated historical BTC candle, Walrus authenticated recall, and GMGN search plus one VVV/Base historical candle now pass with locally configured credentials. See `docs/evidence/provider-verification.json` and `docs/evidence/gmgn-verification.json`. Completed Walrus writes and memory changing a real new-call warning remain release blockers. Other markets need their own coverage checks.
 
 ## Run locally
