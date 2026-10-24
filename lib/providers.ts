@@ -23,7 +23,11 @@ export async function suiMetadata() {
     const parsed=z.object({coinType:z.string().regex(/^0x0*2::sui::SUI$/),metadata:z.object({id:z.string().regex(/^0x[0-9a-fA-F]{64}$/),symbol:z.literal('SUI'),decimals:z.literal(9),name:z.string().min(1)})}).safeParse(raw);
     if(!parsed.success)throw new ProviderError('SUI_RESPONSE_UNVERIFIED');
     return {network:'mainnet',provider:'Tatum',transport:'gRPC',method:'sui.rpc.v2.StateService/GetCoinInfo',coinType:parsed.data.coinType,...parsed.data.metadata,responseHash:hash(JSON.stringify(raw,(_,value)=>typeof value==='bigint'?value.toString():value)),verifiedAt:new Date().toISOString()};
-  }catch(error){if(error instanceof ProviderError)throw error;throw new ProviderError('TATUM_SUI_GRPC_UNAVAILABLE');}
+  }catch(error){if(error instanceof ProviderError)throw error;
+    const code=typeof error==='object' && error!==null && 'code' in error ? String(error.code) : 'UNKNOWN';
+    const message=error instanceof Error ? error.message.replaceAll(process.env.TATUM_API_KEY,'[redacted]').slice(0,500) : 'Unknown gRPC failure';
+    console.error('Tatum Sui gRPC failed',{code,message});
+    throw new ProviderError('TATUM_SUI_GRPC_UNAVAILABLE');}
   finally{transport.close();}
 }
 const price = z.union([z.string().regex(/^\d+(\.\d+)?$/),z.number().positive()]).transform(String);
