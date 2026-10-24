@@ -13,6 +13,8 @@ export function syncSettlementJobs(now=Date.now()) {
     LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL`).run(new Date(now).toISOString());
   db().prepare(`UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=?
     WHERE status!='done' AND EXISTS(SELECT 1 FROM settlements s WHERE s.prediction_id=settlement_jobs.prediction_id)`).run(new Date(now).toISOString());
+  db().prepare(`UPDATE settlement_jobs SET status='paused',lease_token=NULL,lease_until=NULL,last_error='LEASE_RECOVERY_LIMIT_REACHED',updated_at=?
+    WHERE status='running' AND attempts>=? AND lease_until<=?`).run(new Date(now).toISOString(),MAX_ATTEMPTS,new Date(now).toISOString());
 }
 export async function runSettlement(id:string,{force=false,clock=Date.now,fetchCandles=assetCandles}:Options={}):Promise<{message:string;error?:string;result?:ReturnType<typeof settle>}> {
   const receipt=listReceipts().find(row=>row.id===id);

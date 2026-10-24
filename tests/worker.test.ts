@@ -64,6 +64,10 @@ test('durable worker: deadlines, overlapping checks, retries, pause, and lease r
     assert.equal(db().prepare('SELECT last_error FROM settlement_jobs WHERE prediction_id=?').get(missing.id)?.last_error,'PRICE_COVERAGE_UNAVAILABLE');
     const connection=new DatabaseSync(process.env.CALBOK_DB_PATH!);
     assert.equal(connection.prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(missing.id)?.status,'retry');connection.close();
+    const crashed=due();
+    db().prepare("INSERT INTO settlement_jobs(prediction_id,status,attempts,next_attempt_at,lease_token,lease_until,updated_at) VALUES (?,'running',8,?,'crashed',?,?)").run(crashed.id,new Date(now-180_000).toISOString(),new Date(now-1).toISOString(),new Date(now-180_000).toISOString());
+    await runSettlement(crashed.id,{clock,fetchCandles:async()=>{throw new Error('Must not read after the crash recovery limit');}});
+    assert.equal(db().prepare('SELECT status,last_error FROM settlement_jobs WHERE prediction_id=?').get(crashed.id)?.last_error,'LEASE_RECOVERY_LIMIT_REACHED');
     db().prepare("UPDATE settlement_jobs SET status='paused' WHERE prediction_id=?").run(missing.id);
     const batch=Array.from({length:4},()=>due());let batchCalls=0;
     const counted=async(asset:string,boundary:number)=>{batchCalls++;return prices(asset,boundary);};
