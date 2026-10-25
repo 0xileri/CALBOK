@@ -14,6 +14,7 @@ const {createSession,principal,cookie,requestCode,verifyCode,revokeSession}=awai
 const {capture,listReceipts,db,hash}=await import('../lib/db');
 const {GET:workspace,POST:captureRoute}=await import('../app/api/workspace/route');
 const {POST:action}=await import('../app/api/actions/route');
+const {GET:sessionList,POST:sessionAction}=await import('../app/api/sessions/route');
 const {PATCH:profile}=await import('../app/api/profile/route');
 const {accountDetails}=await import('../lib/account-profile');
 const {POST:auth}=await import('../app/api/auth/route');
@@ -22,6 +23,17 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
   try {
     const alice=createSession({id:'alice',email:'alice@example.com',role:'user'}),bob=createSession({id:'bob',email:'bob@example.com',role:'user'});
     assert.equal(principal(request('workspace',alice))?.id,'alice');assert.equal(principal(request('workspace',bob))?.id,'bob');
+    const aliceOther=createSession({id:'alice',role:'user',email:'alice@example.com'});
+    createSession({id:'alice',role:'user',email:'alice@example.com'},Date.now()-8*86400_000);
+    const sessionResponse=await sessionList(request('sessions',alice)),sessionData=await sessionResponse.json();
+    assert.equal(sessionResponse.status,200);assert.equal(sessionData.total,2);assert.equal(sessionData.otherCount,1);assert.equal(sessionData.sessions.filter((row:{current:boolean})=>row.current).length,1);
+    assert.ok(!JSON.stringify(sessionData).includes(alice));assert.ok(!JSON.stringify(sessionData).includes(hash(alice)));assert.ok(!JSON.stringify(sessionData).includes('email'));
+    assert.equal((await sessionAction(request('sessions',alice,{action:'revoke_others',user_id:'bob'}))).status,400);
+    assert.equal((await sessionAction(request('sessions',alice,{action:'revoke_others'},'https://evil.example'))).status,403);
+    const revoked=await sessionAction(request('sessions',alice,{action:'revoke_others'}));assert.equal(revoked.status,200);const result=await revoked.json();assert.equal(result.revoked,1);assert.equal(result.total,1);
+    assert.equal(principal(request('workspace',aliceOther)),null);assert.equal(principal(request('workspace',alice))?.id,'alice');assert.equal(principal(request('workspace',bob))?.id,'bob');
+    assert.equal((await sessionAction(request('sessions',aliceOther,{action:'revoke_others'}))).status,401);assert.equal((await sessionList(request('sessions'))).status,401);
+    assert.equal((await (await sessionAction(request('sessions',alice,{action:'revoke_others'}))).json()).revoked,0);
     const stored=db().prepare('SELECT token_hash FROM sessions').all();assert.ok(!JSON.stringify(stored).includes(alice));assert.ok(JSON.stringify(stored).includes(hash(alice)));
     assert.match(cookie(alice,request('auth')),/HttpOnly; SameSite=Lax; Max-Age=604800; Secure/);
     const edit=(token:string,value:unknown,origin='https://calbok.example')=>profile(new Request(request('profile',token,value,origin),{method:'PATCH'}));
