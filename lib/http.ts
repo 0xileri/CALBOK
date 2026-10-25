@@ -2,7 +2,10 @@ import {principal} from './auth';
 export function originGuard(request:Request,requireOrigin=false) {
   const origin=request.headers.get('origin');
   const expected=process.env.CALBOK_PUBLIC_ORIGIN||`${new URL(request.url).protocol}//${(request.headers.get('host')||'').toLowerCase()}`;
-  if((requireOrigin&&!origin)||(origin&&origin!==expected))return Response.json({error:'Cross-origin requests refused.'},{status:403});
+  // Additional deployment origins are explicit exact origins, never wildcard or Host-derived aliases.
+  const additional=(process.env.CALBOK_ADDITIONAL_ORIGINS||'').split(',').map(value=>value.trim()).filter(value=>{try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)&&url.origin===value;}catch{return false;}});
+  const allowed=[expected,...additional];
+  if((requireOrigin&&!origin)||(origin&&!allowed.includes(origin)))return Response.json({error:'Cross-origin requests refused.'},{status:403});
 }
 export function authorize(request:Request) {
   const denied=originGuard(request);if(denied)return denied;

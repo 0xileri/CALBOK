@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { authorize, body } from '../lib/http';
+import { authorize, body, originGuard } from '../lib/http';
 test('local guard rejects cross-origin and non-loopback access',()=>{
   delete process.env.CALBOK_ADMIN_TOKEN;
   assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'localhost:3000'}})),undefined);
@@ -26,4 +26,19 @@ test('HTTPS proxy deployment accepts only the configured browser origin',()=>{
   assert.equal(authorize(new Request('http://internal:3000/api',{headers:{...headers,origin:'https://evil.example'}}))?.status,403);
   delete process.env.CALBOK_PUBLIC_ORIGIN;
   delete process.env.CALBOK_ADMIN_TOKEN;
+});
+
+
+test('explicit owned domain aliases work while unlisted, malformed and absent origins stay blocked',()=>{
+  process.env.CALBOK_PUBLIC_ORIGIN='https://calbok.example';
+  process.env.CALBOK_ADDITIONAL_ORIGINS='https://calbok.xyz, https://calbok.example/path, *, null, https://calbok.xyz/';
+  const request=(origin?:string)=>new Request('http://internal:3000/api/auth',{headers:{host:'internal:3000',...(origin?{origin}:{})}});
+  try {
+    assert.equal(originGuard(request('https://calbok.xyz'),true),undefined);
+    assert.equal(originGuard(request('https://calbok.example'),true),undefined);
+    for(const origin of ['https://evil.example','https://calbok.xyz.evil.example','http://calbok.xyz','null','https://calbok.example/path','https://calbok.xyz/'])assert.equal(originGuard(request(origin),true)?.status,403);
+    assert.equal(originGuard(request(),true)?.status,403);
+    delete process.env.CALBOK_ADDITIONAL_ORIGINS;
+    assert.equal(originGuard(request('https://calbok.xyz'),true)?.status,403);
+  }finally{delete process.env.CALBOK_PUBLIC_ORIGIN;delete process.env.CALBOK_ADDITIONAL_ORIGINS;}
 });
