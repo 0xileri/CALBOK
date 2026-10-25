@@ -11,6 +11,7 @@ export function db() {
   mkdirSync(dirname(path),{recursive:true});
   instance = new DatabaseSync(path);
   instance.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
+    CREATE TABLE IF NOT EXISTS call_drafts(owner_id TEXT PRIMARY KEY,fields TEXT NOT NULL,version INTEGER NOT NULL,updated_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS assets (id TEXT PRIMARY KEY, symbol TEXT NOT NULL, name TEXT NOT NULL, provider TEXT NOT NULL, chain TEXT, address TEXT, discovered_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS asset_checks (id TEXT PRIMARY KEY, asset_id TEXT NOT NULL, checked_at TEXT NOT NULL, evidence TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS predictions (
@@ -50,7 +51,7 @@ export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("S
 export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}
 export function registerAsset(asset:Asset){db().prepare('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?)').run(asset.id,asset.symbol,asset.name,asset.provider,asset.chain||null,asset.address||null,asset.discoveredAt||new Date().toISOString());}
 export function knownAsset(id:string):Asset|null{const row=db().prepare('SELECT * FROM assets WHERE id=?').get(id) as Record<string,string>|undefined;return row?{id:row.id,symbol:row.symbol,name:row.name,provider:row.provider as Asset['provider'],chain:row.chain,address:row.address}:null;}
-export function capture(claim:Claim,ownerId='operator') {
+export function capture(claim:Claim,ownerId='operator',draftVersion?:number) {
   const assetMetadata=knownAsset(claim.asset);
   if(parseGmgnAssetId(claim.asset)&&!assetMetadata)throw new Error('GMGN token must be discovered and selected first');
   const now = new Date(), id = `CB-${randomUUID()}`;
@@ -63,6 +64,7 @@ export function capture(claim:Claim,ownerId='operator') {
     database.prepare('INSERT INTO prediction_owners VALUES (?,?)').run(id,ownerId);
     database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_locked',hash(snapshot),now.toISOString());
     database.prepare('INSERT INTO settlement_jobs (prediction_id,next_attempt_at,updated_at) VALUES (?,?,?)').run(id,new Date(Date.parse(deadline)+60_000).toISOString(),now.toISOString());
+    if(draftVersion!==undefined)database.prepare("UPDATE call_drafts SET fields='null',version=version+1,updated_at=? WHERE owner_id=? AND version=?").run(now.toISOString(),ownerId,draftVersion);
     database.exec('COMMIT'); return id;
   } catch(error) { database.exec('ROLLBACK'); throw error; }
 }

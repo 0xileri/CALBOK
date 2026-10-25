@@ -113,3 +113,9 @@ Email-code login is implemented but stays unavailable until `RESEND_API_KEY`, `C
 `CALBOK_PUBLIC_SIGNIN_ENABLED=false` keeps email login owner-only. `CALBOK_USER_PROVIDER_ACCESS=false` blocks member provider actions and automatic member settlement; changing it may incur provider costs. Enabling either is a deliberate deployment setting, not something the sign-in UI does. New accounts get separate journals. Legacy records stay owned by `operator`; ownership is an additive immutable mapping, preserving original snapshots and hashes. Receipt reads, actions, memory ledgers and recall history resolve within the authenticated owner. Member memory namespaces include the account ID. Worker processing remains internal, with member eligibility gated by provider access.
 
 JSON/CSV exports contain only the signed-in account's journal. Public receipt pages and account import are not implemented. A direct receipt link still requires access to the owning account. Database backups should include sessions, accounts and ownership tables; never share the database publicly.
+
+## Private saved drafts
+
+Log a call includes **Save draft**, even before market, direction or horizon are selected. One private draft is stored per account on the server. Reopening Log a call resumes it across browsers and reloads. Saving is explicit; closing without Save draft discards unsaved edits. Drafts do not create receipt IDs, deadlines, scores, settlement jobs or memory writes.
+
+The draft API scopes every read/write to the authenticated account and uses an optimistic version check. Stale saves fail with a conflict instead of overwriting newer work. Receipt capture clears only the matching saved version in the same database transaction; a newer draft from another browser is preserved. A cleared draft retains a version counter to prevent stale saves from resurrecting or overwriting it. Draft text is omitted from receipt JSON/CSV exports until a call is confirmed and locked.

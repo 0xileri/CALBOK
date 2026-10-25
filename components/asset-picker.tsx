@@ -3,8 +3,8 @@ import {useState} from 'react';
 import {Check,ChevronDown,LoaderCircle,Search,ShieldCheck,X} from 'lucide-react';
 import {GMGN_CHAINS,TATUM_CATALOG,tatumAssets,type Asset} from '@/lib/assets';
 import './asset-picker.css';
-export function AssetPicker({headers,onSelected,gmgnConfigured}:{headers:()=>HeadersInit;onSelected:(asset:Asset|null)=>void;gmgnConfigured:boolean}){
-  const [provider,setProvider]=useState<'Tatum'|'GMGN'>('Tatum'),[query,setQuery]=useState(''),[chain,setChain]=useState('all'),[results,setResults]=useState<Asset[]>([]),[selected,setSelected]=useState<Asset|null>(null),[busy,setBusy]=useState(''),[error,setError]=useState(''),[proof,setProof]=useState(''),[searched,setSearched]=useState(false),[expanded,setExpanded]=useState(false);
+export function AssetPicker({headers,onSelected,gmgnConfigured,initialAsset=null}:{initialAsset?:Asset|null;headers:()=>HeadersInit;onSelected:(asset:Asset|null)=>void;gmgnConfigured:boolean}){
+  const [provider,setProvider]=useState<'Tatum'|'GMGN'>(initialAsset?.provider||'Tatum'),[query,setQuery]=useState(''),[chain,setChain]=useState('all'),[results,setResults]=useState<Asset[]>([]),[selected,setSelected]=useState<Asset|null>(initialAsset),[busy,setBusy]=useState(''),[error,setError]=useState(''),[proof,setProof]=useState(''),[searched,setSearched]=useState(false),[expanded,setExpanded]=useState(false);
   const listed=provider==='Tatum'?tatumAssets(query):results;
   function resetSelection(){setSelected(null);onSelected(null);setProof('');setError('');}
   async function search(){

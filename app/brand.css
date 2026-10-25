@@ -125,3 +125,7 @@ label{font-size:11px;font-weight:600}label>span{color:#6b7d5b}label>input,label>
 .profile-edit{padding:24px 0;border-bottom:1px solid #dfe3d5}.profile-edit label{display:grid;gap:10px;font-size:12px}.profile-edit input{padding:12px;border:1px solid #cfd6c6;border-radius:5px;background:#fffef8;width:100%;color:#142c25}.profile-edit p{font-size:12px;line-height:1.7;color:#677260}.profile-edit>div{display:flex;gap:16px;align-items:center}.account-profile-heading h2,.account-sidebar>span{overflow-wrap:anywhere}
 
 .account-sessions{border-top:1px solid #dfe3d5;padding:24px 0;margin-top:24px}.account-sessions-heading{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap}.account-sessions h3{display:flex;align-items:center;gap:10px;font-size:16px}.account-sessions p,.account-sessions small{font-size:12px;line-height:1.7;color:#677260}.account-sessions small{display:block;margin-top:12px}.account-sessions ul{list-style:none;padding:0;margin:16px 0}.account-sessions li{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid #e5e8dd;font-size:12px}.account-sessions time{color:#677260;font-size:11px}.account-sessions .session-error{color:#95432d}
+
+.draft-save{margin:0 0 12px}
+
+.draft-message{padding:14px;background:#e7edd9;color:#174c3c;border:1px solid #d5e1c4;border-radius:5px;font-size:12px;line-height:1.6;margin:14px 0}

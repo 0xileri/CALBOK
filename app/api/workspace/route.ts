@@ -1,3 +1,4 @@
+import {z} from 'zod';
 import {principal} from '@/lib/auth';
 import { authorize, body, rateLimit } from '@/lib/http';
 import { capture, db, listReceipts,knownAsset } from '@/lib/db';
@@ -16,10 +17,11 @@ export async function POST(request:Request) {
   const denied=authorize(request);if(denied)return denied;
   if(rateLimit())return Response.json({error:'Please wait a minute before trying again.'},{status:429});
   try {
-    const parsed=claimSchema.safeParse(await body(request));
+    const input=await body(request),parsed=claimSchema.safeParse(input);
+    const draftVersion=z.object({draftVersion:z.number().int().positive().optional()}).parse(input).draftVersion;
     if(!parsed.success)return Response.json({error:parsed.error.issues.map(i=>i.message).join(' ')},{status:400});
     if(parseGmgnAssetId(parsed.data.asset)&&!knownAsset(parsed.data.asset))return Response.json({error:'Search for and select this GMGN token first so its identity can be preserved.'},{status:400});
-    const id=capture(parsed.data,principal(request)!.id);return Response.json({id},{status:201});
+    const id=capture(parsed.data,principal(request)!.id,draftVersion);return Response.json({id},{status:201});
   } catch(error) {
     const duplicate=error instanceof Error && error.message.includes('UNIQUE');
     return Response.json({error:duplicate?'This call is already locked.':'Could not lock this call. Check the input and try again.'},{status:duplicate?409:400});
