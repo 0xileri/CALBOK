@@ -1,9 +1,10 @@
 import {z} from 'zod';
+import {accountDetails} from '@/lib/account-profile';
 import {body,originGuard} from '@/lib/http';
 import {cookie,createSession,emailReady,matchesOperator,principal,requestCode,revokeSession,verifyCode} from '@/lib/auth';
 export const runtime='nodejs';
 const response=(data:unknown,status=200,headers:Record<string,string>={})=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...headers}});
-export async function GET(request:Request){const denied=originGuard(request);if(denied)return denied;const user=principal(request);return response({user:user?{role:user.role,email:user.email}:null,emailAvailable:emailReady(),publicSignup:process.env.CALBOK_PUBLIC_SIGNIN_ENABLED==='true'});}
+export async function GET(request:Request){const denied=originGuard(request);if(denied)return denied;const user=principal(request);return response({user:user?accountDetails(user):null,emailAvailable:emailReady(),publicSignup:process.env.CALBOK_PUBLIC_SIGNIN_ENABLED==='true'});}
 export async function POST(request:Request){
   const denied=originGuard(request,true);if(denied)return denied;
   try {

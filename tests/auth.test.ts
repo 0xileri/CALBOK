@@ -14,6 +14,8 @@ const {createSession,principal,cookie,requestCode,verifyCode,revokeSession}=awai
 const {capture,listReceipts,db,hash}=await import('../lib/db');
 const {GET:workspace,POST:captureRoute}=await import('../app/api/workspace/route');
 const {POST:action}=await import('../app/api/actions/route');
+const {PATCH:profile}=await import('../app/api/profile/route');
+const {accountDetails}=await import('../lib/account-profile');
 const {POST:auth}=await import('../app/api/auth/route');
 function request(path:string,token?:string,payload?:unknown,origin='https://calbok.example') {return new Request('https://calbok.example/api/'+path,{method:payload?'POST':'GET',headers:{host:'calbok.example',origin,...(token?{cookie:'calbok_session='+token}:{}),'Content-Type':'application/json'},...(payload?{body:JSON.stringify(payload)}:{})});}
 test('sessions isolate journals, jobs and actions; email challenges expire, lock out and cannot replay',async()=>{
@@ -22,6 +24,17 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
     assert.equal(principal(request('workspace',alice))?.id,'alice');assert.equal(principal(request('workspace',bob))?.id,'bob');
     const stored=db().prepare('SELECT token_hash FROM sessions').all();assert.ok(!JSON.stringify(stored).includes(alice));assert.ok(JSON.stringify(stored).includes(hash(alice)));
     assert.match(cookie(alice,request('auth')),/HttpOnly; SameSite=Lax; Max-Age=604800; Secure/);
+    const edit=(token:string,value:unknown,origin='https://calbok.example')=>profile(new Request(request('profile',token,value,origin),{method:'PATCH'}));
+    assert.equal((await edit(alice,{displayName:'Alice Example'})).status,200);
+    assert.equal(accountDetails({id:'alice',role:'user',email:'alice@example.com'}).displayName,'Alice Example');
+    assert.equal(accountDetails({id:'bob',role:'user',email:'bob@example.com'}).displayName,'');
+    assert.equal((await edit(alice,{displayName:'Attacker',user_id:'bob'})).status,400);
+    assert.equal((await edit(alice,{displayName:'x'.repeat(61)})).status,400);
+    assert.equal((await edit(alice,{displayName:'line\nbreak'})).status,400);
+    assert.equal((await edit(alice,{displayName:'Changed'},'https://evil.example')).status,403);
+    assert.equal((await edit(alice,{displayName:'  Élodie Test  '})).status,200);
+    assert.equal(accountDetails({id:'alice',role:'user',email:null}).displayName,'Élodie Test');
+    assert.equal((await edit(alice,{displayName:''})).status,200);
     const claim={caller:'Same caller',text:'AUTH TEST ONLY: price higher',asset:'BTC',direction:'bullish' as const,horizon:'24h' as const,sourceUrl:''};
     const a=capture(claim,'alice'),b=capture(claim,'bob'),legacy=capture({...claim,text:'Legacy operator test only'});
     assert.equal(listReceipts('alice').length,1);assert.equal(listReceipts('bob').length,1);assert.equal(listReceipts('operator')[0].id,legacy);
@@ -42,7 +55,7 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
     process.env.CALBOK_PUBLIC_SIGNIN_ENABLED='false';let sent=false;await requestCode('closed@example.com',async()=>{sent=true;},now);assert.equal(sent,false);
     const wrongOrigin=await auth(request('auth',undefined,{action:'operator',token:process.env.CALBOK_ADMIN_TOKEN},'https://evil.example'));assert.equal(wrongOrigin.status,403);
     const login=await auth(request('auth',undefined,{action:'operator',token:process.env.CALBOK_ADMIN_TOKEN}));assert.equal(login.status,200);assert.match(login.headers.get('set-cookie')||'',/HttpOnly/);
-    revokeSession(request('auth',alice));assert.equal(principal(request('workspace',alice)),null);assert.equal((await workspace(request('workspace',alice))).status,401);
+    revokeSession(request('auth',alice));assert.equal((await edit(alice,{displayName:'Revoked'})).status,401);assert.equal(principal(request('workspace',alice)),null);assert.equal((await workspace(request('workspace',alice))).status,401);
     const expiredSession=createSession({id:'expired',role:'user',email:null},now-8*86400_000);assert.equal(principal(request('workspace',expiredSession)),null);
   }finally{db().close();rmSync(directory,{recursive:true,force:true});}
 });
