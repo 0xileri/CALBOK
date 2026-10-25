@@ -1,7 +1,25 @@
 import type {Receipt} from './db';
-export type JournalFilters={query:string;outcome:string;asset:string;horizon:string;direction:string;order:string};
+export type JournalFilters={query:string;outcome:string;asset:string;horizon:string;direction:string;order:string;from?:string;to?:string;dateField?:string};
+function utcDay(value:string) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return NaN;
+  const time=Date.parse(value+'T00:00:00.000Z');
+  return Number.isFinite(time)&&new Date(time).toISOString().slice(0,10)===value?time:NaN;
+}
+export function journalDateError(from='',to='') {
+  if((from&&!Number.isFinite(utcDay(from)))||(to&&!Number.isFinite(utcDay(to))))return 'Choose valid calendar dates.';
+  if(from&&to&&from>to)return 'The start date must be on or before the end date.';
+  return '';
+}
+export function journalDatePreset(days:number,now=new Date()) {
+  const to=now.toISOString().slice(0,10),end=utcDay(to);
+  return {from:new Date(end-(days-1)*86400_000).toISOString().slice(0,10),to};
+}
 export function filterJournal(receipts:Receipt[],filters:JournalFilters) {
-  return receipts.filter(row=>(filters.outcome==='All calls'||(filters.outcome==='Pending'?(!row.outcome||row.outcome==='pending'):row.outcome===filters.outcome.toLowerCase()))&&(filters.asset==='all'||row.asset===filters.asset)&&(filters.horizon==='all'||row.horizon===filters.horizon)&&(filters.direction==='all'||row.direction===filters.direction)&&`${row.text} ${row.caller} ${row.asset} ${row.asset_symbol||''} ${row.id}`.toLowerCase().includes(filters.query.trim().toLowerCase())).sort((a,b)=>{
+  if(journalDateError(filters.from,filters.to))return [];
+  const start=filters.from?utcDay(filters.from):-Infinity,end=filters.to?utcDay(filters.to)+86400_000:Infinity;
+  const dateField=filters.dateField==='deadline'?'deadline':'locked_at';
+  const inRange=(row:Receipt)=>{if(!filters.from&&!filters.to)return true;const time=Date.parse(row[dateField]);return time>=start&&time<end;};
+  return receipts.filter(row=>inRange(row)&&(filters.outcome==='All calls'||(filters.outcome==='Pending'?(!row.outcome||row.outcome==='pending'):row.outcome===filters.outcome.toLowerCase()))&&(filters.asset==='all'||row.asset===filters.asset)&&(filters.horizon==='all'||row.horizon===filters.horizon)&&(filters.direction==='all'||row.direction===filters.direction)&&`${row.text} ${row.caller} ${row.asset} ${row.asset_symbol||''} ${row.id}`.toLowerCase().includes(filters.query.trim().toLowerCase())).sort((a,b)=>{
     const field=filters.order==='deadline'?'deadline':'locked_at';
     const difference=Date.parse(a[field])-Date.parse(b[field]);
     return (filters.order==='newest'?-difference:difference)||a.id.localeCompare(b.id);

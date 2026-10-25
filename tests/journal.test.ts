@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {Receipt} from '../lib/db';
-import {filterJournal,journalExport,csvCell,journalCsv,type JournalFilters} from '../lib/journal';
+import {filterJournal,journalDateError,journalDatePreset,journalExport,csvCell,journalCsv,type JournalFilters} from '../lib/journal';
 const filters:JournalFilters={query:'',outcome:'All calls',asset:'all',horizon:'all',direction:'all',order:'newest'};
 const rows=[{id:'a',caller:'Alice',text:'Original text',asset:'gmgn:base:one',asset_symbol:'SAME',direction:'bullish',horizon:'24h',locked_at:'2026-01-01',deadline:'2026-01-02',outcome:null},{id:'b',caller:'Bob',text:'Other text',asset:'gmgn:base:two',asset_symbol:'SAME',direction:'bearish',horizon:'7d',locked_at:'2026-01-02',deadline:'2026-01-09',outcome:'won'}] as Receipt[];
 test('journal search scopes canonical identities and sorts without mutating original records',()=>{
@@ -25,4 +25,20 @@ test('CSV quotes Unicode, commas and newlines and neutralizes formula prefixes',
   assert.equal(csvCell('普通 text'),'"普通 text"');
   assert.ok(journalCsv(rows).startsWith('\uFEFF"id","caller"'));
   assert.ok(!journalCsv(rows).includes('undefined'));
+});
+
+test('UTC journal ranges include whole end dates and independently filter lock times or deadlines',()=>{
+  const timed=[{...rows[0],id:'start',locked_at:'2026-10-01T00:00:00.000Z',deadline:'2026-10-02T00:00:00.000Z'},{...rows[0],id:'end',locked_at:'2026-10-01T23:59:59.999Z',deadline:'2026-10-08T23:59:59.999Z'},{...rows[0],id:'next',locked_at:'2026-10-02T00:00:00.000Z',deadline:'2026-10-09T00:00:00.000Z'}];
+  assert.deepEqual(filterJournal(timed,{...filters,from:'2026-10-01',to:'2026-10-01'}).map(row=>row.id),['end','start']);
+  assert.deepEqual(filterJournal(timed,{...filters,to:'2026-10-01'}).map(row=>row.id),['end','start']);
+  assert.deepEqual(filterJournal(timed,{...filters,from:'2026-10-02'}).map(row=>row.id),['next']);
+  assert.deepEqual(filterJournal(timed,{...filters,dateField:'deadline',from:'2026-10-08',to:'2026-10-08'}).map(row=>row.id),['end']);
+  assert.equal(filterJournal(timed,{...filters,from:'2026-10-02',to:'2026-10-01'}).length,0);
+  assert.equal(filterJournal(timed,{...filters,from:'2026-02-30'}).length,0);
+  assert.equal(filterJournal(timed,{...filters,from:'bad'}).length,0);
+  assert.equal(journalExport(filterJournal(timed,{...filters,to:'2026-10-01'})).count,2);
+  assert.deepEqual(journalDatePreset(7,new Date('2026-01-02T00:30:00+01:00')),{from:'2025-12-26',to:'2026-01-01'});
+  assert.deepEqual(journalDatePreset(1,new Date('2026-10-25T23:59:59Z')),{from:'2026-10-25',to:'2026-10-25'});
+  assert.equal(journalDateError('2024-02-29','2024-02-29'),'');
+  assert.ok(journalDateError('2026-02-29',''));
 });
