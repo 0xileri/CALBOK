@@ -1,6 +1,6 @@
 # Actual readiness
 
-As of 24 October 2026 this is a deployed single-operator workspace, not a final submission.
+As of 25 October 2026 this is a deployed private-beta workspace, not a final submission. Public registration remains disabled.
 
 | Requirement | Status / proof |
 | --- | --- |
@@ -12,7 +12,8 @@ As of 24 October 2026 this is a deployed single-operator workspace, not a final 
 | 10 completed Mainnet memories | 0; blocked |
 | Replayable adaptation from genuine evidence | Deterministic policy tested; live demonstration pending |
 | Durable unattended worker | Settlement queue implemented with leases, retries, heartbeat and bounded batches; automated failure/recovery tests. Walrus writes remain manual. A genuine call still needs to reach its deadline for live settlement proof |
-| Hosted single-operator deployment | Railway live at https://calbok.up.railway.app/; protected journal APIs, persistent volume, health check, GitHub deployments. Multi-user tenant access remains unimplemented |
+| Hosted single-operator deployment | Railway live at https://calbok.up.railway.app/; protected journal APIs, persistent volume, health check, GitHub deployments. Account-scoped journals, email-code sessions, profile editing, session revocation and private drafts are implemented and tested; public registration and member provider spending remain disabled |
+| Public product homepage | Implemented: workflow, evidence limits, privacy FAQ and sign-in navigation. Private receipt links still require authorized access |
 | Published blog / public repository | Initial source shipped to private 0xileri/CALBOK; public visibility and blog remain pending |
 | 2–3 minute demo video | Pending; script outline present |
 | Official rules, eligibility and deadline audit | Pending verification against organizers before submission |

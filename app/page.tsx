@@ -5,6 +5,7 @@ import type { Receipt } from '@/lib/db';
 import {SettlementMonitor,type SettlementStatus} from '@/components/settlement-monitor';
 import {emptyDraft,type DraftFields} from '@/lib/draft-fields';
 import {AccountProfile,accountInitials,type AccountIdentity} from '@/components/account-profile';
+import {PublicHome} from '@/components/public-home';
 import {SignIn} from '@/components/sign-in';
 import {receiptFragment,receiptIdFromFragment} from '@/lib/receipt-links';
 import {profileStats} from '@/lib/caller-profiles';
@@ -36,11 +37,15 @@ export default function Home(){
   const [callDraft,setCallDraft]=useState<Record<string,string>|null>(null);
   const [initialDraft,setInitialDraft]=useState<DraftFields>(emptyDraft),[draftVersion,setDraftVersion]=useState(0);
   const [access,setAccess]=useState<'loading'|'guest'|'connected'>('loading'),[authInfo,setAuthInfo]=useState<{emailAvailable:boolean;publicSignup:boolean;user:AccountIdentity|null}>({emailAvailable:false,publicSignup:false,user:null});
+  const [guestScreen,setGuestScreen]=useState<'home'|'signin'>('home');
+  useEffect(()=>{function sync(){setGuestScreen(window.location.hash==='#signin'||window.location.hash.startsWith('#receipt=')?'signin':'home');}sync();window.addEventListener('hashchange',sync);return()=>window.removeEventListener('hashchange',sync);},[]);
+  function openSignIn(){setGuestScreen('signin');if(!window.location.hash.startsWith('#receipt='))window.history.replaceState(null,'',window.location.pathname+window.location.search+'#signin');window.scrollTo(0,0);}
+  function openPublicHome(){setGuestScreen('home');window.history.replaceState(null,'',window.location.pathname+window.location.search);window.scrollTo(0,0);}
   const headers=useCallback(()=>({'Content-Type':'application/json'}),[]);
   useEffect(()=>{let active=true;fetch('/api/auth').then(response=>response.json()).then(data=>{if(active){setAuthInfo(data);setAccess(data.user?'connected':'guest');}}).catch(()=>{if(active)setAccess('guest');});return()=>{active=false;};},[]);
   const refresh=useCallback(async()=>{const generation=accessGeneration.current;try{const res=await fetch('/api/workspace',{headers:headers()});const data=await res.json();if(generation!==accessGeneration.current)return;if(res.status===401){accessGeneration.current++;setWorkspace(initial);setSelected(null);setAccess('guest');return;}if(!res.ok)throw new Error(data.error);setWorkspace(data);setError('');}catch(e){if(generation===accessGeneration.current)setError(e instanceof Error?e.message:'Workspace unavailable');}finally{if(generation===accessGeneration.current)setLoading(false);}},[headers]);
-  async function signedIn(){accessGeneration.current++;try{const response=await fetch('/api/auth');if(response.ok)setAuthInfo(await response.json());}catch{}setAccess('connected');setLoading(true);await refresh();}
-  async function signOut(){const result=await fetch('/api/auth',{method:'POST',headers:headers(),body:JSON.stringify({action:'logout'})});if(!result.ok){setNotice('Could not sign out. Please try again.');return;}accessGeneration.current++;setWorkspace(initial);setSelected(null);setCreate(false);setReview(null);setAccess('guest');setError('');}
+  async function signedIn(){if(window.location.hash==='#signin')window.history.replaceState(null,'',window.location.pathname+window.location.search);accessGeneration.current++;try{const response=await fetch('/api/auth');if(response.ok)setAuthInfo(await response.json());}catch{}setAccess('connected');setLoading(true);await refresh();}
+  async function signOut(){const result=await fetch('/api/auth',{method:'POST',headers:headers(),body:JSON.stringify({action:'logout'})});if(!result.ok){setNotice('Could not sign out. Please try again.');return;}accessGeneration.current++;setWorkspace(initial);setSelected(null);setCreate(false);setReview(null);setAccess('guest');setError('');openPublicHome();}
 
   useEffect(()=>{
     if(access!=='connected')return;
@@ -88,8 +93,8 @@ export default function Home(){
   async function saveProfile(displayName:string){const response=await fetch('/api/profile',{method:'PATCH',headers:headers(),body:JSON.stringify({displayName})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not save your profile.');setAuthInfo(current=>({...current,user:data.user}));}
   function navigate(next:View){transitionTo(next);setMobile(false);setQuery('');}
   function openReceipt(r:Receipt){window.history.replaceState(null,'',window.location.pathname+window.location.search+receiptFragment(r.id));setSelected(r);setReview(null);setNotice('');}
-  if(access==='loading')return <main className="signin-loading"><LoaderCircle className="spin"/><p>Opening your workspace…</p></main>;
-  if(access==='guest')return <SignIn emailAvailable={authInfo.emailAvailable} publicSignup={authInfo.publicSignup} onSignedIn={()=>void signedIn()}/>;
+  if(access==='loading'||(access==='guest'&&guestScreen==='home'))return <PublicHome onSignIn={openSignIn} checking={access==='loading'} publicSignup={authInfo.publicSignup}/>;
+  if(access==='guest')return <SignIn onBack={openPublicHome} emailAvailable={authInfo.emailAvailable} publicSignup={authInfo.publicSignup} onSignedIn={()=>void signedIn()}/>;
   return <div className="app-shell">
     <aside className={`sidebar ${mobile?'show':''}`}>
       <button className="wordmark" onClick={()=>navigate('Overview')} aria-label="CALBOK home"><span className="brand-icon"><BrandMark/></span>CALBOK<span className="brand-dot">.</span></button>
