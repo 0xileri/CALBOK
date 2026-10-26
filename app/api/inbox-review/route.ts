@@ -1,0 +1,8 @@
+import {z} from 'zod';
+import {authorize,originGuard,body} from '@/lib/http';
+import {principal} from '@/lib/auth';
+import {readInboxReview,saveInboxReview} from '@/lib/call-inbox';
+export const runtime='nodejs';
+const idSchema=z.string().regex(/^LOG-[a-zA-Z0-9-]{1,100}$/),headers={'Cache-Control':'no-store'};
+export async function GET(request:Request){const denied=authorize(request);if(denied)return denied;const id=idSchema.safeParse(new URL(request.url).searchParams.get('id'));if(!id.success)return Response.json({error:'Invalid captured-call ID.'},{status:400,headers});const review=readInboxReview(id.data,principal(request)!.id);return review?Response.json({review},{headers}):Response.json({error:'Call not found in your inbox.'},{status:404,headers});}
+export async function PUT(request:Request){const origin=originGuard(request,true);if(origin)return origin;const denied=authorize(request);if(denied)return denied;try{const input=z.object({id:idSchema,note:z.string().max(2000),reviewed:z.boolean(),version:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER-1)}).strict().parse(await body(request));return Response.json({review:saveInboxReview(input.id,principal(request)!.id,input.note,input.reviewed,input.version)},{headers});}catch(error){const message=error instanceof Error?error.message:'',conflict=message==='REVIEW_CONFLICT',missing=message==='REVIEW_NOT_FOUND';return Response.json({error:conflict?'Your review changed in another browser. Copy your unsaved note before reopening this call.':missing?'Call not found in your inbox.':'Could not save review. Use at most 2,000 characters.'},{status:conflict?409:missing?404:400,headers});}}
