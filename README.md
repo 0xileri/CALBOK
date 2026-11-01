@@ -133,3 +133,5 @@ Captured calls support a private reflection and a manual Reviewed flag. These ar
 Overview includes a private captured-call review queue with total capture count, review counts for the latest 100 entries, and up to three pending calls. Opening a queue item filters the inbox by exact call ID and expands its review. Queue reads do not fetch private notes or create provider jobs.
 
 Captured-call CSV export respects the current search/review filter within the latest 100 entries. It explicitly exports call identity, text, caller, source, logging timestamp, personal review status and unscored label. Private notes and credentials are excluded; formula-like cells are neutralized for spreadsheets. This is not a full historical inbox backup.
+
+Call inbox now loads older history in cursor-based batches of 100, ordered by logging time and ID. Search, review filters and CSV apply to the loaded entries; Load older calls expands that scope. Overview review queue remains limited to the latest 100. Cursors never change account ownership or include private review notes.
