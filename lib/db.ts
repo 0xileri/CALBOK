@@ -45,7 +45,7 @@ export function db() {
     CREATE TRIGGER IF NOT EXISTS keep_prediction_owner BEFORE DELETE ON prediction_owners BEGIN SELECT RAISE(ABORT,'Receipt ownership is immutable'); END;`);
   return instance;
 }
-export type Receipt = {id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
+export type Receipt = {snapshot?:string;id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
 export const hash = (value:string) => createHash('sha256').update(value).digest('hex');
 export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("SELECT p.*, a.symbol AS asset_symbol, a.provider AS asset_provider, s.outcome, s.evidence, s.method FROM predictions p LEFT JOIN settlements s ON s.prediction_id=p.id LEFT JOIN assets a ON a.id=p.asset LEFT JOIN prediction_owners o ON o.prediction_id=p.id"+(ownerId?" WHERE COALESCE(o.owner_id,'operator')=?":"")+' ORDER BY p.locked_at DESC').all(...(ownerId?[ownerId]:[])) as unknown as Receipt[]; }
 export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}

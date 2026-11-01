@@ -9,4 +9,4 @@ This is a future recording outline. Live integration proof is not yet available.
 - 1:45–2:20: Show a completed Walrus write and recall after restart. Compare the same new call's baseline with contextual results. Explain matching category, sample threshold and clickable citations. This segment is blocked until enough genuine relevant results exist.
 - 2:20–2:45: Open the memory ledger and proof of 10 completed Mainnet writes. State sample and coverage limitations; link the public repo/blog.
 
-No published video, blog, deployment or submission exists yet.
+The app is deployed at calbok.xyz. A published video, blog and final submission are not verified. Use Integration proof to show actual counts; never treat an implemented screen as completed live integration proof.

@@ -1,3 +1,5 @@
+import {recordMemoryCompletion,recordRecall} from '@/lib/integration-proof-store';
+import {profileOutcome} from '@/lib/caller-profiles';
 import {principal} from '@/lib/auth';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -37,13 +39,14 @@ export async function POST(request:Request) {
       try {
         const result=await client.waitForRememberJob(jobId,{timeoutMs:20_000});
         if(!result.blob_id)throw new ProviderError('MEMORY_BLOB_UNCONFIRMED');
-        db().prepare('UPDATE memory_jobs SET status=?,blob_id=?,completed_at=?,error=NULL WHERE prediction_id=?').run('done',result.blob_id,new Date().toISOString(),receipt.id);
+        recordMemoryCompletion(receipt.id,jobId,result.blob_id);
         return Response.json({message:'Durable memory completion confirmed.',blobId:result.blob_id});
       } catch {db().prepare('UPDATE memory_jobs SET error=? WHERE prediction_id=?').run('Completion not confirmed; retry status check.',receipt.id);return Response.json({message:'Memory pending or failed. Completion has not been confirmed.'},{status:202});}
     }
     const recalled=await client.recall({query:`caller=${receipt.caller}; asset=${receipt.asset}; horizon=${receipt.horizon}; direction=${receipt.direction}`,namespace,limit:20,maxDistance:0.5});
     const ids=recalled.results.flatMap(match=>{try {const parsed=JSON.parse(match.text);return typeof parsed.predictionId==='string'?[parsed.predictionId]:[];}catch{return [];}});
-    const history=listReceipts(user.id).map(r=>({id:r.id,caller:r.caller,asset:r.asset,direction:r.direction,horizon:r.horizon,outcome:r.outcome||'pending',verified:!!r.evidence}));
-    return Response.json({message:'Contextual recall complete. Only SQL-confirmed matching outcomes are counted.',review:warning(receipt,history,ids)});
+    const history=listReceipts(user.id).map(r=>({id:r.id,caller:r.caller,asset:r.asset,direction:r.direction,horizon:r.horizon,outcome:r.outcome||'pending',verified:['won','lost'].includes(profileOutcome(r))}));
+    const review=warning(receipt,history,ids);recordRecall(receipt.id,user.id,review);
+    return Response.json({message:'Contextual recall complete. Only SQL-confirmed matching outcomes are counted.',review});
   } catch(error) {return Response.json({error:error instanceof ProviderError?error.code:'Action unavailable. Check configuration or provider response; no success was recorded.'},{status:503});}
 }

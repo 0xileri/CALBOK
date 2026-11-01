@@ -1,22 +1,32 @@
-# Actual readiness
+# Actual readiness — 1 November 2026
 
-As of 25 October 2026 this is a deployed private-beta workspace, not a final submission. Public registration remains disabled.
+This is a deployed private-beta workspace, not a completed submission. Latest read-only production check: **2 unscored captured calls, 0 locked scored receipts, 0 settlement jobs and 0 memory jobs**. Public registration remains disabled. Missing proof is not a provider failure.
+
+## Next action for the owner
+
+**Lock a genuine forward-looking call**, with its exact market, direction and deadline. Quick captures and retrospective screenshots do not qualify as scored proof. Wait for finalized evidence, inspect settlement, then explicitly Remember and Recall. Never fabricate calls or outcomes to fill a quota.
 
 | Requirement | Status / proof |
 | --- | --- |
-| Local app and immutable SQL capture | Implemented; automated checks and local UI verification recorded in development report |
-| Deterministic directional settlement | Unit-tested; BTC and VVV historical samples verified. A genuine locked call still needs to reach its deadline for a full live settlement |
-| Tatum historical market data | One BTC historical 1m candle validated; see provider-verification.json. Other markets pending |
-| Meaningful Sui Mainnet read | PASS: gRPC GetCoinInfo with real coin metadata object; see evidence document |
-| Walrus Mainnet remember → done → recall | Authenticated recall PASS; completed writes and write/recall round trip pending |
-| 10 completed Mainnet memories | 0; blocked |
-| Replayable adaptation from genuine evidence | Deterministic policy tested; live demonstration pending |
-| Durable unattended worker | Settlement queue implemented with leases, retries, heartbeat and bounded batches; automated failure/recovery tests. Walrus writes remain manual. A genuine call still needs to reach its deadline for live settlement proof |
-| Hosted single-operator deployment | Railway live at https://calbok.up.railway.app/; protected journal APIs, persistent volume, health check, GitHub deployments. Account-scoped journals, email-code sessions, profile editing, session revocation and private drafts are implemented and tested; public registration and member provider spending remain disabled |
-| Public product homepage | Implemented: workflow, evidence limits, privacy FAQ and sign-in navigation. Private receipt links still require authorized access |
-| Published blog / public repository | Initial source shipped to private 0xileri/CALBOK; public visibility and blog remain pending |
-| 2–3 minute demo video | Pending; script outline present |
-| Official rules, eligibility and deadline audit | Pending verification against organizers before submission |
-| Final submission form and private entrant fields | Pending; never commit personal details |
+| Capture and journal | Implemented: text/screenshot capture, browser-local English OCR, image paste/drop, duplicate warnings, private reviews, full-history pagination and filtered CSV |
+| Caller profiles | Implemented: captured/reviewed counts and captured history alongside separately verified performance |
+| Immutable prospective SQL capture | Implemented and tested; **no genuine live locked receipt yet** |
+| Deterministic directional settlement | Reproducibility tested; historical provider samples checked previously. Full genuine live lock → deadline → settlement proof pending |
+| Relevant Tatum Sui Mainnet read | Prior real gRPC GetCoinInfo proof recorded in evidence document. Integration proof screen counts only validated metadata actually stored in this workspace |
+| Walrus Mainnet remember → done → recall | Authenticated recall previously passed; **no completed write/recall round trip yet** |
+| 10 completed Mainnet memories | **0 / 10. Owner action pending**. Accepted/running jobs do not count |
+| Replayable adaptation | Policy tested; live demonstration pending. At least five relevant memories must have completed before a later target call was locked for caution proof |
+| Integration proof screen | Implemented: read-only owner-scoped progress, job/blob completion evidence, persisted SQL-linked recall, next action and explicit manual requirements. No provider calls are triggered by viewing it |
+| Durable worker | Leases, retries, heartbeat and bounded settlement batches implemented/tested. Memory writes remain explicit |
+| Deployment and access | Railway at https://calbok.xyz; private journal APIs, persistent volume, GitHub deployments, email sessions and account controls. Public signup/member provider spending remain disabled |
+| Public homepage / branding | Implemented with workflow, privacy limits, brand kit and sign-in |
+| Public repository and blog | Source on private 0xileri/CALBOK; public visibility and published blog not verified |
+| Demo video | Pending; script outline in demo-script.md |
+| Restart/recall demonstration | Pending; persisted records alone do not prove a recall performed after restart |
+| Official rules and submission | Current rules, eligibility and submission completion still require verification. Do not commit entrant information |
 
-The attached brief cites 10 November 2026 at 17:00 UTC (18:00 Lagos) as deadline. This date is **provided by the brief**, not independently verified by this build. Verify current official rules at [Tatum](https://tatum.io/hackathon/total-recall) and the organizer portal before relying on it.
+## Evidence rules
+
+Integration proof only counts reproducible eligible SQL settlements and distinct done jobs/blobs with a matching Mainnet completion record captured at confirmation. Older jobs without this record remain unproven; configuration is not proof. The network record describes the configured Mainnet path, not an independently verified chain transaction. Recall proof excludes raw memory text and private notes, and rechecks citations against SQL. User reminders do not create calls, spend provider funds or write memories.
+
+The original brief cites 10 November 2026 at 17:00 UTC (18:00 Lagos). This date is supplied by the brief and remains unverified here. Check current official rules at https://tatum.io/hackathon/total-recall and the organizer portal before relying on it.

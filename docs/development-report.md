@@ -1,3 +1,16 @@
+# Current implementation — 1 November 2026
+
+The historical report below describes the initial build, not current readiness. See submission-checklist.md for current blockers.
+
+- Deployed private beta at calbok.xyz with account-scoped journals, email sessions and owner controls.
+- Added public homepage, brand assets, transitions, shareable receipts, private reviews, journal exports/date filters, weekly reviews and settlement monitoring.
+- Added quick unscored captures, local screenshot OCR, image paste/drop, advisory duplicate checks, full-history loading and captured caller profiles.
+- Added Integration proof: owner-scoped stored-evidence progress, Mainnet completion records, persisted recall citations/results and explicit next actions. Viewing proof performs no paid provider work. Remember and Recall remain explicit receipt actions.
+- 48 tests pass; lint and production build checked. Synthetic fixtures stay isolated from production.
+- Latest production check: 2 captured calls, 0 locked scored receipts, 0 settlement jobs and 0 memory jobs. Genuine full-loop proof, completed Mainnet memories, restart recall, blog and demo remain pending.
+
+---
+
 # Initial implementation — 24 October 2026
 
 ## Files and behavior
