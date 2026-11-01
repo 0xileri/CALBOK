@@ -16,3 +16,6 @@
 !next-env.d.ts
 !tsconfig.json
 !Dockerfile
+
+!scripts/prepare-ocr.mjs
+public/ocr/

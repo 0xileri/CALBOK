@@ -11,18 +11,22 @@
     "test": "tsx --test tests/*.test.ts",
     "providers:verify": "tsx scripts/verify-providers.ts",
     "assets:sync": "tsx scripts/sync-tatum-catalog.ts",
-    "gmgn:verify": "tsx scripts/verify-gmgn.ts"
+    "gmgn:verify": "tsx scripts/verify-gmgn.ts",
+    "prebuild": "node scripts/prepare-ocr.mjs",
+    "predev": "node scripts/prepare-ocr.mjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "1.14.5",
     "@mysten-incubation/memwal": "0.1.9",
     "@mysten/sui": "2.37.0",
     "@protobuf-ts/grpc-transport": "2.11.1",
+    "@tesseract.js-data/eng": "^1.0.0",
     "decimal.js": "^10.6.0",
     "lucide-react": "^0.468.0",
     "next": "16.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tesseract.js": "^7.0.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
