@@ -1,6 +1,6 @@
 # Railway deployment
 
-Use one Node 24 Docker service and one persistent volume mounted at `/data`. Set `CALBOK_DB_PATH=/data/calbok.sqlite`, `PORT=3000`, a random operator token of at least 32 characters, and `CALBOK_PUBLIC_ORIGIN=https://calbok.up.railway.app` for the primary workspace. Set `CALBOK_ADDITIONAL_ORIGINS=https://calbok.xyz` for the alias. Provider credentials are runtime variables. Local environment files and data are excluded from upload and Docker builds.
+Use one Node 24 Docker service and one persistent volume mounted at `/data`. Set `CALBOK_DB_PATH=/data/calbok.sqlite`, `PORT=3000`, a random operator token of at least 32 characters, and `CALBOK_PUBLIC_ORIGIN=https://calbok.xyz` for the primary workspace. Set `CALBOK_ADDITIONAL_ORIGINS=https://calbok.up.railway.app` for the alias. Provider credentials are runtime variables. Local environment files and data are excluded from upload and Docker builds.
 
 The public `/api/health` endpoint checks SQLite without exposing records. Journal APIs require the operator token; paste it into Integration settings. Keep one replica because storage and rate limits are local to the service. Configure the health check to `/api/health`.
 

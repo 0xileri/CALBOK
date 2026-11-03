@@ -10,7 +10,7 @@ A private prediction accountability app: lock prospective market calls, inspect 
 
 This is a working **private owner deployment with gated account support** with live provider checks, not a final hackathon submission. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
 
-Primary workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Alias: [calbok.xyz](https://calbok.xyz/). Brand guide: [identity and assets](https://calbok.up.railway.app/brand/index.html). Visitors see a sign-in screen. Journal APIs require a browser session or the existing operator bearer key. Public registration remains closed until email delivery is configured.
+Primary workspace: [calbok.xyz](https://calbok.xyz/). Alias: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand guide: [identity and assets](https://calbok.xyz/brand/index.html). Visitors see a sign-in screen. Journal APIs require a browser session or the existing operator bearer key. Public registration remains closed until email delivery is configured.
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
@@ -120,7 +120,7 @@ Log a call includes **Save draft**, even before market, direction or horizon are
 
 The draft API scopes every read/write to the authenticated account and uses an optimistic version check. Stale saves fail with a conflict instead of overwriting newer work. Receipt capture clears only the matching saved version in the same database transaction; a newer draft from another browser is preserved. A cleared draft retains a version counter to prevent stale saves from resurrecting or overwriting it. Draft text is omitted from receipt JSON/CSV exports until a call is confirmed and locked.
 
-Custom domains must be included in the explicit origin configuration. Set `CALBOK_PUBLIC_ORIGIN=https://calbok.up.railway.app` for the primary workspace and `CALBOK_ADDITIONAL_ORIGINS=https://calbok.xyz` for the alias. Do not include paths, trailing slashes or wildcards. Unlisted origins and missing Origin headers on protected mutations remain refused. Cookies stay host-only, so each domain requires its own sign-in.
+Custom domains must be included in the explicit origin configuration. Set `CALBOK_PUBLIC_ORIGIN=https://calbok.xyz` for the primary workspace and `CALBOK_ADDITIONAL_ORIGINS=https://calbok.up.railway.app` for the alias. Do not include paths, trailing slashes or wildcards. Unlisted origins and missing Origin headers on protected mutations remain refused. Cookies stay host-only, so each domain requires its own sign-in.
 
 ### Capture calls without a scoring deadline
 

@@ -18,7 +18,7 @@ This is a deployed private-beta workspace, not a completed submission. The 3 Nov
 | Replayable adaptation | Policy tested; live demonstration pending. At least five relevant memories must have completed before a later target call was locked for caution proof |
 | Integration proof screen | Implemented: read-only owner-scoped progress, job/blob completion evidence, persisted SQL-linked recall, side-by-side comparison, JSON export, next action and explicit manual requirements. No provider calls are triggered by viewing it |
 | Durable worker | Leases, retries, heartbeat and bounded settlement batches implemented/tested. Owner opt-in enables up to ten automatic Mainnet write attempts |
-| Deployment and access | Primary workspace at https://calbok.up.railway.app via `CALBOK_PUBLIC_ORIGIN`, with https://calbok.xyz in `CALBOK_ADDITIONAL_ORIGINS`. Private journal APIs, persistent volume, GitHub deployments, email sessions and account controls. Public signup/member provider spending remain disabled |
+| Deployment and access | Primary workspace at https://calbok.xyz via `CALBOK_PUBLIC_ORIGIN`, with https://calbok.up.railway.app in `CALBOK_ADDITIONAL_ORIGINS`. Private journal APIs, persistent volume, GitHub deployments, email sessions and account controls. Public signup/member provider spending remain disabled |
 | Public homepage / branding | Implemented with workflow, privacy limits, brand kit and sign-in |
 | Public repository and blog | Source on private 0xileri/CALBOK; public visibility and published blog not verified |
 | Demo video | Pending; script outline in demo-script.md |
