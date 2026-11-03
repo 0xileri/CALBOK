@@ -1,4 +1,4 @@
-import {reconcileMemory,rememberReceipt} from '@/lib/automatic-memory';
+import {reconcileMemory,rememberReceipt,resolveMemoryReview} from '@/lib/automatic-memory';
 import {proofSchema,recordRecall} from '@/lib/integration-proof-store';
 import {completedMemoryProofs,recallComparison,type CompletionProof} from '@/lib/integration-proof';
 import type {MemoryJob} from '@/lib/memory-ledger';
@@ -16,14 +16,21 @@ export async function POST(request:Request) {
   try {
     const user=principal(request)!;
     if(user.role!=='operator'&&process.env.CALBOK_USER_PROVIDER_ACCESS!=='true')return Response.json({error:'Provider actions are not enabled for member accounts yet.'},{status:403});
-    const input=z.object({action:z.enum(['sui','settle','remember','recall','reconcile']),id:z.string().max(80).optional()}).parse(await body(request));
+    const input=z.object({action:z.enum(['sui','settle','remember','recall','reconcile','resolve-memory']),id:z.string().max(80).optional(),decision:z.enum(['link','fail']).optional(),blobId:z.string().trim().min(1).max(256).optional()}).parse(await body(request));
     if(input.action==='sui') {
       const evidence=await suiMetadata();db().prepare('INSERT INTO onchain_evidence VALUES (?,?,?,?,?)').run(randomUUID(),'SUI',evidence.method,JSON.stringify(evidence),evidence.verifiedAt);
       return Response.json({message:'SUI coin identity verified through Tatum Mainnet RPC. This is metadata, not pricing.',evidence});
     }
+    if (input.action==='resolve-memory' && user.role!=='operator') return Response.json({error:'Owner access required.'},{status:403});
     const receipt=listReceipts(user.id).find(r=>r.id===input.id);
     if(!receipt)return Response.json({error:'Receipt not found.'},{status:404});
     if(input.action==='settle') return Response.json(await runSettlement(receipt.id,{force:true}));
+    if (input.action==='resolve-memory') {
+      const origin=originGuard(request,true);if(origin)return origin;
+      if (!input.decision || !input.blobId) return Response.json({error:'A decision and matching blob ID are required.'},{status:400});
+      const {status,message}=resolveMemoryReview(receipt.id,input.decision,input.blobId,user);
+      return Response.json(status>=400?{error:message}:{message},{status});
+    }
     if(input.action==='reconcile') {
       if(user.role!=='operator')return Response.json({error:'Owner access required.'},{status:403});
       const origin=originGuard(request,true);if(origin)return origin;

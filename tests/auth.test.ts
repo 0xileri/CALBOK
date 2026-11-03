@@ -102,6 +102,13 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
     const returnedMember=await requestCode('alice@example.com',send,now);
     assert.deepEqual(verifyCode(returnedMember,code,now),aliceMember);
     assert.equal((await action(request('actions',alice,{action:'reconcile',id:a}))).status,403);
+    assert.equal((await action(request('actions',alice,{action:'resolve-memory',id:a,decision:'fail',blobId:'candidate'}))).status,403);
+    const currentOwnerSession=createSession({id:'operator',email:'owner@example.com',role:'operator'});
+    db().prepare("INSERT INTO memory_jobs(prediction_id,namespace,status,blob_id) VALUES (?,?,'manual_review',?)").run(legacy,'test','candidate');
+    const resolution={action:'resolve-memory',id:legacy,decision:'link',blobId:'candidate'};
+    assert.equal((await action(request('actions',currentOwnerSession,resolution,'https://evil.example'))).status,403);
+    assert.equal((await action(request('actions',currentOwnerSession,resolution))).status,200);
+    assert.equal(db().prepare('SELECT resolved_by FROM memory_review_resolutions WHERE prediction_id=?').get(legacy)?.resolved_by,'owner@example.com');
     const previousEnv=process.env.NODE_ENV, previousToken=process.env.CALBOK_ADMIN_TOKEN;
     try {
       Object.assign(process.env,{NODE_ENV:'production'});

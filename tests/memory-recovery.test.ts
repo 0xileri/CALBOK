@@ -11,7 +11,7 @@ process.env.MEMWAL_NETWORK='mainnet';
 process.env.CALBOK_WORKER_ENABLED='true';
 
 const {capture,db,listReceipts}=await import('../lib/db');
-const {automaticMemoryStatus,automaticMemoryTick,rememberReceipt,reconcileMemory,setAutomaticMemory}=await import('../lib/automatic-memory');
+const {automaticMemoryStatus,automaticMemoryTick,rememberReceipt,reconcileMemory,resolveMemoryReview,setAutomaticMemory}=await import('../lib/automatic-memory');
 type Factory=NonNullable<Parameters<typeof rememberReceipt>[3]>;
 type Client=Awaited<ReturnType<Factory>>;
 function fake(overrides: Partial<Client>): Factory {
@@ -92,11 +92,22 @@ test('failed submissions, reconciliation, and due polling preserve job identity 
         updated_at:new Date().toISOString(),size:1,agent_id:null,package_id:null,status:'done',end_epoch:null,expires_at:null,importance:null
       }]}),
     }));
-    assert.equal(recovered.status,409);
-    assert.match(recovered.message,/Manual review/);
-    assert.equal(job(second.id)?.status,'uncertain');
+    assert.equal(recovered.status,200);
+    assert.equal(job(second.id)?.status,'manual_review');
     assert.equal(job(second.id)?.job_id,null);
-    assert.equal(job(second.id)?.blob_id,null);
+    assert.equal(job(second.id)?.blob_id,'recovered-blob');
+    const owner={id:'operator',role:'operator',email:'owner@example.test'};
+    assert.equal(resolveMemoryReview(second.id,'link','recovered-blob',{...owner,role:'user'}).status,403);
+    assert.equal(resolveMemoryReview(second.id,'link','wrong-blob',owner).status,409);
+    assert.equal(resolveMemoryReview(second.id,'link','recovered-blob',owner).status,200);
+    assert.equal(resolveMemoryReview(second.id,'fail','recovered-blob',owner).status,409);
+    assert.equal(job(second.id)?.status,'done');
+    assert.equal(job(second.id)?.job_id,null);
+    const resolution=db().prepare('SELECT * FROM memory_review_resolutions WHERE prediction_id=?').get(second.id);
+    assert.equal(resolution?.resolved_by,owner.email);
+    assert.equal(resolution?.resolved_at,job(second.id)?.completed_at);
+    assert.equal(resolution?.decision,'link');
+    assert.equal(db().prepare('SELECT 1 FROM memory_completion_proofs WHERE prediction_id=?').get(second.id),undefined);
 
     const third=verified('manual timeout');
     await rememberReceipt(third,'operator',false,fake({remember:async()=>{throw new Error('Test timeout');}}));
@@ -106,10 +117,30 @@ test('failed submissions, reconciliation, and due polling preserve job identity 
     assert.equal(missing.status,202);
     assert.equal(job(third.id)?.job_id,'failed-job');
     await reconcileMemory(third,fake({getRememberStatus:async id=>({job_id:id,status:'failed'})}));
-    assert.equal(job(third.id)?.status,'retryable');
+    assert.equal(job(third.id)?.status,'manual_retryable');
     assert.equal(job(third.id)?.job_id,null);
 
     await testReconciledRefund();
+    await automaticMemoryTick(fake({}));
+    assert.equal(job(third.id)?.status,'manual_retryable');
+    const manualRetry=await rememberReceipt(third,'operator',false,fake({
+      remember:async()=>({job_id:'manual-retry',status:'pending'}),
+      waitForRememberJob:async id=>({id,job_id:id,blob_id:'manual-retry-blob',owner:'test-owner',namespace:'test'})
+    }));
+    assert.equal(manualRetry.status,200);
+
+    const rejected=verified('owner rejects matching blob');
+    await rememberReceipt(rejected,'operator',true,fake({remember:async()=>{throw new Error('Test timeout');}}));
+    db().prepare("UPDATE memory_jobs SET status='manual_review',blob_id='candidate' WHERE prediction_id=?").run(rejected.id);
+    const before=automaticMemoryStatus().used;
+    assert.equal(resolveMemoryReview(rejected.id,'fail','candidate',owner).status,200);
+    assert.equal(job(rejected.id)?.status,'manual_retryable');
+    assert.equal(job(rejected.id)?.blob_id,null);
+    assert.equal(automaticMemoryStatus().used,before-1);
+    const failure=db().prepare('SELECT decision,resolved_by,resolved_at FROM memory_review_resolutions WHERE prediction_id=?').get(rejected.id);
+    assert.equal(failure?.decision,'fail');
+    assert.equal(failure?.resolved_by,owner.email);
+    assert.ok(Number.isFinite(Date.parse(String(failure?.resolved_at))));
     await testManualPolling();
   } finally {
     db().close();
@@ -132,7 +163,7 @@ async function testReconciledRefund() {
   assert.equal(job(receipt.id)?.status,'running');
   assert.equal(automaticMemoryStatus().used,budget);
   assert.equal(keys.length,2);
-  assert.deepEqual(keys[0],keys[1]);
+  assert.notDeepEqual(keys[0],keys[1]);
   await reconcileMemory(receipt,fake({getRememberStatus:async id=>({job_id:id,status:'done',blob_id:'refund-blob'})}));
 }
 

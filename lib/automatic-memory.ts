@@ -5,12 +5,16 @@ import {profileOutcome} from './caller-profiles';
 import {recordMemoryCompletion} from './integration-proof-store';
 
 const automaticLimit = 10;
+const activeSubmissions = new Set<string>();
 type MemoryClient = Pick<Awaited<ReturnType<typeof memoryClient>>, 'remember'|'waitForRememberJob'|'getRememberStatus'|'recall'|'listMemories'>;
 type ClientFactory = (namespace: string) => Promise<MemoryClient>;
 function automaticSchema() {
   db().exec(`CREATE TABLE IF NOT EXISTS automatic_memory_setting (id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS automatic_memory_attempts (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), checked_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS memory_submission_keys (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), idempotency_key TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS memory_review_resolutions (
+      id TEXT PRIMARY KEY, prediction_id TEXT NOT NULL REFERENCES predictions(id),
+      decision TEXT NOT NULL, candidate_blob_id TEXT NOT NULL, resolved_by TEXT NOT NULL, resolved_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS automatic_memory_poll (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), attempts INTEGER NOT NULL, due_at TEXT NOT NULL);`);
 }
 export function automaticMemoryStatus() {
@@ -31,7 +35,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
   const namespace = namespaceFor(owner === 'operator' ? receipt.caller : JSON.stringify([owner, receipt.caller]));
   const existing = database.prepare('SELECT status,job_id FROM memory_jobs WHERE prediction_id=?').get(receipt.id);
   if (existing?.status === 'done') return {status:200, message:'Memory already completed.'};
-  if (existing && !existing.job_id && existing.status !== 'retryable') return {status:409, message:'Write acceptance is uncertain. Reconcile with the provider before retrying.'};
+  if (existing && !existing.job_id && !['retryable','manual_retryable'].includes(String(existing.status))) return {status:409, message:'Write acceptance is uncertain. Reconcile with the provider before retrying.'};
   const client = await getClient(namespace);
   let jobId = existing?.job_id as string | undefined;
   if (!jobId) {
@@ -47,7 +51,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
       }
       const reserved = database.prepare(`INSERT INTO memory_jobs (prediction_id,namespace,status) VALUES (?,?,'queued')
         ON CONFLICT(prediction_id) DO UPDATE SET status='queued',job_id=NULL,blob_id=NULL,error=NULL,completed_at=NULL
-        WHERE memory_jobs.status='retryable'`).run(receipt.id,namespace);
+        WHERE memory_jobs.status='retryable' OR (memory_jobs.status='manual_retryable' AND ?=0)`).run(receipt.id,namespace,Number(automatic));
       if (!reserved.changes) {
         database.exec('ROLLBACK');
         return {status:409, message:'A memory job already exists. Check its status.'};
@@ -63,6 +67,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
       database.exec('ROLLBACK');
       throw error;
     }
+    activeSubmissions.add(receipt.id);
     try {
       const job = await client.remember(memoryText(receipt),{idempotencyKey});
       if (typeof job.job_id !== 'string' || !job.job_id.trim()) throw new Error('Missing provider job ID');
@@ -73,6 +78,8 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
       if (automatic) return {status:202, message:'Memory job accepted. Confirmation is pending.'};
     } catch (error) {
       return recordSubmissionFailure(receipt.id,error,automatic);
+    } finally {
+      activeSubmissions.delete(receipt.id);
     }
   }
   try {
@@ -115,7 +122,7 @@ function recordSubmissionFailure(id: string, error: unknown, automatic: boolean)
   database.exec('BEGIN IMMEDIATE');
   try {
     const updated = database.prepare("UPDATE memory_jobs SET status=?,error=? WHERE prediction_id=? AND job_id IS NULL AND status='queued'")
-      .run(retryable?'retryable':'uncertain',message,id);
+      .run(retryable?(automatic?'retryable':'manual_retryable'):'uncertain',message,id);
     if (updated.changes && automatic && retryable) database.prepare('DELETE FROM automatic_memory_attempts WHERE prediction_id=?').run(id);
     database.exec('COMMIT');
   } catch (failure) {
@@ -129,7 +136,8 @@ export async function reconcileMemory(receipt: Receipt, getClient: ClientFactory
   const database = db();
   const row = database.prepare('SELECT status,namespace,job_id FROM memory_jobs WHERE prediction_id=?').get(receipt.id);
   if (!row) return {status:404,message:'No memory job to reconcile.'};
-  if (row.status === 'done' || row.status === 'retryable') return {status:200,message:row.status==='done'?'Memory already completed.':'Retry is available.'};
+  if (row.status === 'manual_review') return {status:200,message:'Review the matching blob and choose how to resolve it.'};
+  if (row.status === 'done' || row.status === 'retryable' || row.status === 'manual_retryable') return {status:200,message:row.status==='done'?'Memory already completed.':'Retry is available.'};
   const namespace = String(row.namespace);
   const client = await getClient(namespace);
   const jobId = row.job_id as string | null;
@@ -143,10 +151,12 @@ export async function reconcileMemory(receipt: Receipt, getClient: ClientFactory
       const listed = await client.listMemories({namespace,cursor});
       const match = listed.memories.find(memory=>memory.namespace_id===namespace && blobs.has(memory.blob_id));
       if (match) {
-        const message = 'A matching memory was found, but its provider job ID is unverified. Manual review is required.';
-        database.prepare("UPDATE memory_jobs SET error=? WHERE prediction_id=? AND job_id IS NULL AND status IN ('queued','uncertain')")
-          .run(message,receipt.id);
-        return {status:409,message};
+        if (activeSubmissions.has(receipt.id)) return {status:202,message:'The submission is still in progress.'};
+        const message = 'A matching memory was found. Review the blob ID and choose how to resolve it.';
+        const updated = database.prepare(`UPDATE memory_jobs SET status='manual_review',blob_id=?,error=?
+          WHERE prediction_id=? AND job_id IS NULL AND status IN ('queued','uncertain')`)
+          .run(match.blob_id,message,receipt.id);
+        return updated.changes ? {status:200,message} : {status:409,message:'Memory job changed. Refresh the receipt.'};
       }
       if (!listed.has_more || !listed.next_cursor) break;
       cursor = listed.next_cursor;
@@ -164,12 +174,10 @@ export async function reconcileMemory(receipt: Receipt, getClient: ClientFactory
     automaticSchema();
     database.exec('BEGIN IMMEDIATE');
     try {
-      const updated = database.prepare("UPDATE memory_jobs SET status='retryable',job_id=NULL,error=? WHERE prediction_id=? AND job_id=? AND status<>'done'")
-        .run('Provider confirmed terminal failure. Retry is available.',receipt.id,jobId);
-      if (updated.changes) {
-        database.prepare('DELETE FROM automatic_memory_attempts WHERE prediction_id=?').run(receipt.id);
-        database.prepare('DELETE FROM automatic_memory_poll WHERE prediction_id=?').run(receipt.id);
-      }
+      const automatic = database.prepare('SELECT 1 FROM automatic_memory_attempts WHERE prediction_id=?').get(receipt.id);
+      const updated = database.prepare("UPDATE memory_jobs SET status=?,job_id=NULL,error=? WHERE prediction_id=? AND job_id=? AND status<>'done'")
+        .run(automatic?'retryable':'manual_retryable','Provider confirmed terminal failure. Retry is available.',receipt.id,jobId);
+      if (updated.changes) resetFailedSubmission(receipt.id);
       database.exec('COMMIT');
     } catch (error) {
       database.exec('ROLLBACK');
@@ -178,6 +186,44 @@ export async function reconcileMemory(receipt: Receipt, getClient: ClientFactory
     return {status:200,message:'Provider confirmed failure. Retry is available.'};
   }
   return {status:202,message:'Provider completion is still unconfirmed.'};
+}
+
+function resetFailedSubmission(id: string) {
+  const database = db();
+  database.prepare('DELETE FROM automatic_memory_attempts WHERE prediction_id=?').run(id);
+  database.prepare('DELETE FROM automatic_memory_poll WHERE prediction_id=?').run(id);
+  database.prepare(`INSERT INTO memory_submission_keys VALUES (?,?)
+    ON CONFLICT(prediction_id) DO UPDATE SET idempotency_key=excluded.idempotency_key`).run(id,randomUUID());
+}
+
+export function resolveMemoryReview(id: string, decision: 'link'|'fail', blobId: string, actor: {id:string;role:string;email:string|null}) {
+  if (actor.role !== 'operator' || actor.id !== 'operator' || ownerOf(id) !== actor.id) {
+    return {status:403,message:'Owner access required.'};
+  }
+  automaticSchema();
+  const database = db();
+  const resolvedAt = new Date().toISOString();
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    const linked = decision === 'link';
+    const updated = database.prepare(`UPDATE memory_jobs SET status=?,blob_id=?,completed_at=?,error=?
+      WHERE prediction_id=? AND status='manual_review' AND job_id IS NULL AND blob_id=?`)
+      .run(linked?'done':'manual_retryable',linked?blobId:null,linked?resolvedAt:null,
+        linked?null:'Owner marked the job failed. Manual retry is available.',id,blobId);
+    if (!updated.changes) {
+      database.exec('ROLLBACK');
+      return {status:409,message:'Memory review changed or the blob ID does not match. Refresh the receipt.'};
+    }
+    if (!linked) resetFailedSubmission(id);
+    // Owner confirmation records a blob link without inventing a provider job ID or proof.
+    database.prepare('INSERT INTO memory_review_resolutions VALUES (?,?,?,?,?,?)')
+      .run(randomUUID(),id,decision,blobId,actor.email??actor.id,resolvedAt);
+    database.exec('COMMIT');
+    return {status:200,message:linked?'Owner confirmed and linked the blob.':'Owner marked the job failed. Manual retry is available.'};
+  } catch (error) {
+    database.exec('ROLLBACK');
+    throw error;
+  }
 }
 
 export async function automaticMemoryTick(getClient: ClientFactory = memoryClient, clock = Date.now) {
