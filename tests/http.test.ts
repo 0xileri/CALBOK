@@ -1,12 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { authorize, body, originGuard } from '../lib/http';
-test('local guard rejects cross-origin and non-loopback access',()=>{
+test('spoofed loopback Host and forwarding headers cannot grant owner access',()=>{
   delete process.env.CALBOK_ADMIN_TOKEN;
-  assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'localhost:3000'}})),undefined);
-  assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'127.0.0.1:3000',origin:'http://127.0.0.1:3000'}})),undefined);
-  assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'127.0.0.1:3000',origin:'http://localhost:3000'}}))?.status,403);
-  assert.equal(authorize(new Request('http://evil.example/api',{headers:{host:'evil.example'}}))?.status,403);
+  for(const host of ['localhost:3000','127.0.0.1:3000']) {
+    const request=new Request('http://remote.example/api',{headers:{host,'x-forwarded-for':'127.0.0.1','x-real-ip':'127.0.0.1',origin:'http://'+host}});
+    assert.equal(authorize(request)?.status,403);
+  }
+  assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'localhost:3000'}}))?.status,403);
   assert.equal(authorize(new Request('http://localhost:3000/api',{headers:{host:'localhost:3000',origin:'https://evil.example'}}))?.status,403);
 });
 test('operator token required when configured',()=>{

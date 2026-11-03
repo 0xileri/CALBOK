@@ -10,7 +10,7 @@ A private prediction accountability app: lock prospective market calls, inspect 
 
 This is a working **private owner deployment with gated account support** with live provider checks, not a final hackathon submission. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
 
-Live workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand guide: [identity and assets](https://calbok.up.railway.app/brand/index.html). Visitors see a sign-in screen. Journal APIs require a browser session or the existing operator bearer key. Public registration remains closed until email delivery is configured.
+Primary workspace: [calbok.up.railway.app](https://calbok.up.railway.app/). Alias: [calbok.xyz](https://calbok.xyz/). Brand guide: [identity and assets](https://calbok.up.railway.app/brand/index.html). Visitors see a sign-in screen. Journal APIs require a browser session or the existing operator bearer key. Public registration remains closed until email delivery is configured.
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
@@ -30,7 +30,7 @@ Copy-Item .env.example .env.local
 npm.cmd run dev
 ```
 
-Open [CALBOK](http://127.0.0.1:3000). No account or provider key is needed to lock a local prospective call. Store secrets only in `.env.local`; never paste them into a receipt.
+Set a random `CALBOK_ADMIN_TOKEN` in `.env.local`, then open [CALBOK](http://127.0.0.1:3000) and use **Workspace owner access**. Local call capture works without provider keys. Store secrets only in `.env.local`; never paste them into a receipt.
 
 1. Log a caller and original text. Search the 439-symbol Tatum catalog or use GMGN to select a token by chain and contract address. Coin, direction and horizon have no silent defaults.
 2. Review the original text, exact market, direction and horizon before confirming. Back to edit preserves the draft. Confirm to lock the server timestamp, deadline, structured contract and snapshot hash; review alone creates no receipt.
@@ -68,7 +68,7 @@ npm.cmd run build
 ## Design boundaries
 
 - Private owner journal with per-account receipt ownership and scoped APIs. Email verification authenticates an account, not the caller labels on receipts. Public signup and member provider operations are disabled by default. No public reputation rankings.
-- Only directional 24-hour/7-day prospective calls; target calls, retrospective imports, disputes, X API verification, and automatic extraction are not implemented.
+- Prospective directional calls support 1h, 4h, 24h and 7d; target calls, retrospective imports, disputes, X API verification, and automatic extraction are not implemented.
 - The searchable catalog includes all 439 symbols from Tatum's official OHLCV schema, plus live GMGN token search. Provider listing or discovery is **not a promise of validated historical coverage**. Use the selected asset's **Verify historical pricing sample** button; entry/exit timestamps are independently checked again at settlement. Production acceptance should enforce coverage requirements for the relevant window.
 - Structured fields are the scoring contract; prose is preserved as untrusted data and is never executed or interpreted by an LLM. The author must resolve contradictory prose before submitting.
 - The Tatum price parser requires explicit millisecond `openTime`/`closeTime` and OHLC fields. Live verification confirmed a 59,999ms inclusive close for 1-minute data. The adapter normalizes only exact 59,999ms/60,000ms intervals to an exclusive close and preserves `sourceCloseTime` and the raw-response hash. Other durations are rejected.
@@ -106,7 +106,7 @@ See [architecture](docs/architecture.md), [scoring](docs/scoring.md), and [actua
 
 ## Sign-in and account boundaries
 
-The public root shows a branded sign-in screen instead of an operator-token error. The existing owner can open **Workspace owner access**, enter the existing admin key once, and start a seven-day session. Browser credentials are in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS), not localStorage. Sign out revokes the server session. The top-right avatar and sidebar Your account button open Account profile with the authenticated email, access role and sign-out controls. Account profile supports a display name up to 60 characters, with initials updated in the header and sidebar. Blank names restore the email-based fallback. Display names are scoped to the authenticated account and do not rewrite immutable receipt caller labels. Account profile also lists active browser sessions and their UTC expiry times. Sign out other sessions revokes only the current account’s other active sessions, preserving this browser session. Up to 20 sessions are displayed, with full counts. Session management requires a valid browser cookie; bearer-only API clients and unauthenticated local mode cannot use these controls. Session tokens, token hashes, IP addresses and device fingerprints are never returned. Sign-in email editing is not implemented. Existing bearer-key API clients continue to work. Local loopback development without an admin key remains available.
+The public root shows a branded sign-in screen instead of an operator-token error. The existing owner can open **Workspace owner access**, enter the existing admin key once, and start a seven-day session. Browser credentials are in an HttpOnly, SameSite=Lax cookie (Secure over HTTPS), not localStorage. Sign out revokes the server session. The top-right avatar and sidebar Your account button open Account profile with the authenticated email, access role and sign-out controls. Account profile supports a display name up to 60 characters, with initials updated in the header and sidebar. Blank names restore the email-based fallback. Display names are scoped to the authenticated account and do not rewrite immutable receipt caller labels. Account profile also lists active browser sessions and their UTC expiry times. Sign out other sessions revokes only the current account’s other active sessions, preserving this browser session. Up to 20 sessions are displayed, with full counts. Session management requires a valid browser cookie; bearer-only API clients cannot use these controls. Session tokens, token hashes, IP addresses and device fingerprints are never returned. Sign-in email editing is not implemented. Existing bearer-key API clients continue to work. Configure an operator token for local owner access. Production requires the token before protected requests can authenticate.
 
 Email-code login is implemented but stays unavailable until `RESEND_API_KEY`, `CALBOK_EMAIL_FROM` (a verified sender), and `CALBOK_OWNER_EMAIL` are set. `CALBOK_SESSION_SECRET` is an optional separate random 32+ character code-hashing secret; otherwise the strong admin key is used. Codes expire in 10 minutes, permit five attempts, and work once. Only HMAC code digests and session-token hashes are stored. Email requests have durable per-address and global hourly budgets. No code is printed to logs or returned to the browser. Delivery is not live-verified while email is unconfigured.
 
@@ -120,7 +120,7 @@ Log a call includes **Save draft**, even before market, direction or horizon are
 
 The draft API scopes every read/write to the authenticated account and uses an optimistic version check. Stale saves fail with a conflict instead of overwriting newer work. Receipt capture clears only the matching saved version in the same database transaction; a newer draft from another browser is preserved. A cleared draft retains a version counter to prevent stale saves from resurrecting or overwriting it. Draft text is omitted from receipt JSON/CSV exports until a call is confirmed and locked.
 
-Custom domains must be included in the explicit origin configuration. Keep `CALBOK_PUBLIC_ORIGIN` as the primary origin; set `CALBOK_ADDITIONAL_ORIGINS` to comma-separated, exact owned origins (for example `https://calbok.xyz`). Do not include paths, trailing slashes or wildcards. Unlisted origins and missing Origin headers on protected mutations remain refused. Cookies stay host-only, so each domain requires its own sign-in.
+Custom domains must be included in the explicit origin configuration. Set `CALBOK_PUBLIC_ORIGIN=https://calbok.up.railway.app` for the primary workspace and `CALBOK_ADDITIONAL_ORIGINS=https://calbok.xyz` for the alias. Do not include paths, trailing slashes or wildcards. Unlisted origins and missing Origin headers on protected mutations remain refused. Cookies stay host-only, so each domain requires its own sign-in.
 
 ### Capture calls without a scoring deadline
 

@@ -79,6 +79,29 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
     const expired=await requestCode('expire@example.com',send,now);assert.equal(verifyCode(expired,code,now+600_000),null);
     const locked=await requestCode('locked@example.com',send,now),lockedCode=code;for(let i=0;i<5;i++)assert.equal(verifyCode(locked,'incorrect',now),null);assert.equal(verifyCode(locked,lockedCode,now),null);
     const owner=await requestCode('owner@example.com',send,now);assert.equal(verifyCode(owner,code,now)?.id,'operator');
+    const oldOwnerSession=createSession({id:'operator',email:'owner@example.com',role:'operator'});
+    const oldOwnerSnapshot=listReceipts('operator')[0].snapshot;
+    process.env.CALBOK_OWNER_EMAIL='  ALICE@EXAMPLE.COM  ';
+    const promoted=await requestCode('alice@example.com',send,now);
+    assert.deepEqual(verifyCode(promoted,code,now),{id:'operator',role:'operator',email:'alice@example.com'});
+    assert.equal(principal(request('workspace',oldOwnerSession)),null);
+    assert.equal(listReceipts('operator')[0].snapshot,oldOwnerSnapshot);
+    assert.equal(listReceipts('alice').length,baseline+2);
+    const demoted=await requestCode('owner@example.com',send,now);
+    assert.equal(verifyCode(demoted,code,now)?.role,'user');
+    assert.equal((await action(request('actions',alice,{action:'reconcile',id:a}))).status,403);
+    const previousEnv=process.env.NODE_ENV, previousToken=process.env.CALBOK_ADMIN_TOKEN;
+    try {
+      Object.assign(process.env,{NODE_ENV:'production'});
+      delete process.env.CALBOK_ADMIN_TOKEN;
+      assert.equal(principal(request('workspace',alice)),null);
+      assert.equal((await workspace(request('workspace',alice))).status,403);
+    } finally {
+      if(previousEnv===undefined)Reflect.deleteProperty(process.env,'NODE_ENV');
+      else Object.assign(process.env,{NODE_ENV:previousEnv});
+      process.env.CALBOK_ADMIN_TOKEN=previousToken;
+    }
+
     for(let i=0;i<5;i++)await requestCode('limited@example.com',send,now);await assert.rejects(()=>requestCode('limited@example.com',send,now),/Too many/);
     process.env.CALBOK_PUBLIC_SIGNIN_ENABLED='false';let sent=false;await requestCode('closed@example.com',async()=>{sent=true;},now);assert.equal(sent,false);
     const wrongOrigin=await auth(request('auth',undefined,{action:'operator',token:process.env.CALBOK_ADMIN_TOKEN},'https://evil.example'));assert.equal(wrongOrigin.status,403);

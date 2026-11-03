@@ -14,7 +14,7 @@ Memory namespaces are deterministic hashes of exact caller labels, scoped to the
 
 Memory state flow: reserve queued → accepted job ID/running → confirmed completion plus blob ID/done. Pending completion can be polled again; uncertain acceptance cannot be resubmitted automatically. Errors never increment completed-write counts. A crash after provider acceptance but before saving the job ID requires provider reconciliation; exactly-once external effects cannot be guaranteed by SQLite alone.
 
-All API routes require an operator bearer token when configured. Without a token, host allowlisting restricts routes to loopback hostnames. Cross-origin browser requests are refused. Requests are limited to 8 KiB, with a single-process 20-action/minute operator budget. This is a local convenience guard, not public multi-tenant security.
+Protected routes require an authenticated session or operator bearer token. Production requires an operator token to be configured. Cross-origin browser requests are refused. Requests are limited to 8 KiB, with a single-process 20-action/minute operator budget. This is a local convenience guard, not public multi-tenant security.
 
 Missing production work: verified asset registry; normalized caller/source/asset entities; versioned migrations; immutable correction/supersession workflow; durable job worker with bounded retries; multi-process rate limiting; tenant identity; operational telemetry; persisted recall bundles and provider raw-response archives; live integration proof. Current provider errors are redacted generic codes.
 
