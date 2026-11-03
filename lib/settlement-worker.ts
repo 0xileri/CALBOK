@@ -1,3 +1,4 @@
+import {automaticMemoryTick} from './automatic-memory';
 import {randomUUID} from 'node:crypto';
 import {db,hash,listReceipts} from './db';
 import {METHOD,settle,type Candle} from './domain';
@@ -76,6 +77,7 @@ export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Opti
       AND j.next_attempt_at<=? AND (j.lease_until IS NULL OR j.lease_until<=?)
       AND p.deadline<=? AND (COALESCE((SELECT owner_id FROM prediction_owners WHERE prediction_id=p.id),'operator')='operator' OR ?=1) ORDER BY j.next_attempt_at LIMIT 3`).all(iso,iso,new Date(now-60_000).toISOString(),process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0) as {prediction_id:string}[];
     for(const job of due)await runSettlement(job.prediction_id,{clock,fetchCandles});
+    if(process.env.CALBOK_WORKER_ENABLED==='true')await automaticMemoryTick();
   } catch {database.prepare("UPDATE worker_state SET last_error='WORKER_TICK_FAILED' WHERE id=1 AND owner=?").run(owner);}
   finally {database.prepare('UPDATE worker_state SET heartbeat_at=?,lease_until=NULL,owner=NULL WHERE id=1 AND owner=?').run(new Date(clock()).toISOString(),owner);}
 }

@@ -14,7 +14,7 @@ The loop runs once a minute, processes at most three due receipts, and requests 
 
 Job state, next retry, attempts, sanitized error codes, and a worker heartbeat are visible in Integration settings and receipt details. Status refreshes every 30 seconds while the browser is visible. The UI displays the latest 100 jobs; the worker processes the full queue. Each job has a two-minute lease; an abandoned job can be recovered after expiry. Settlement, job completion, and its audit event commit together. Manual and automatic settlement share the same lease and immutable outcome contract.
 
-Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. The loop does not write or recall Walrus memories. Those actions remain manual. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
+Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. The owner can enable automatic Walrus Mainnet writes in Integration settings. The worker reserves at most ten automatic attempts, including eligible existing settlements, and checks accepted jobs by ID. Recall is initiated from the receipt. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
 
 ## Browser sign-in
 

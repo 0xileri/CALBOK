@@ -1,3 +1,4 @@
+import {horizons} from './horizons';
 import Decimal from 'decimal.js';
 import { z } from 'zod';
 import {isAllowedAsset} from './assets';
@@ -7,7 +8,7 @@ export const claimSchema = z.object({
   text: z.string().trim().min(10).max(2000),
   asset: z.string().max(120).refine(isAllowedAsset,'Choose a listed Tatum market or a GMGN token with a valid chain and contract address.'),
   direction: z.enum(['bullish', 'bearish']),
-  horizon: z.enum(['24h', '7d']),
+  horizon: z.enum(horizons),
   // This release supports prospectively self-logged directional calls only.
   sourceUrl: z.union([z.literal(''), z.url().refine(v => new URL(v).protocol === 'https:', 'Use an HTTPS URL')]).default(''),
 });

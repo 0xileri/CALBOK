@@ -1,3 +1,4 @@
+import {horizonHours} from './horizons';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -55,7 +56,7 @@ export function capture(claim:Claim,ownerId='operator',draftVersion?:number) {
   const assetMetadata=knownAsset(claim.asset);
   if(parseGmgnAssetId(claim.asset)&&!assetMetadata)throw new Error('GMGN token must be discovered and selected first');
   const now = new Date(), id = `CB-${randomUUID()}`;
-  const deadline = new Date(now.getTime()+(claim.horizon==='24h'?24:168)*3600_000).toISOString();
+  const deadline = new Date(now.getTime()+horizonHours[claim.horizon]*3600_000).toISOString();
   const snapshot = JSON.stringify({...claim,id,lockedAt:now.toISOString(),deadline,method:'directional-open-v1',...(assetMetadata?{assetMetadata}:{})});
   const fingerprint = hash(JSON.stringify([...(ownerId==='operator'?[]:[ownerId]),claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon]));
   const database = db(); database.exec('BEGIN IMMEDIATE');

@@ -2,9 +2,13 @@ import {createHash} from 'node:crypto';
 import type {Receipt} from './db';
 import type {MemoryJob} from './memory-ledger';
 import {profileOutcome} from './caller-profiles';
-import {warning} from './domain';
+import {warning, type Candle} from './domain';
 export type CompletionProof={prediction_id:string;job_id:string;blob_id:string;network:string;completed_at:string};
 export type RecallProof={prediction_id:string;review:string;created_at:string};
+function exportCandle({openTime,closeTime,sourceCloseTime,open,high,low,close,hash}: Candle) {
+  return {openTime,closeTime,sourceCloseTime,open,high,low,close,hash};
+}
+
 export function integrationProof(receipts:Receipt[],jobs:MemoryJob[],completions:CompletionProof[],recalls:RecallProof[],onchain:{id:string;evidence:string;verified_at:string}[]){
  const locked=receipts.filter(row=>row.provenance==='self_logged_before_outcome'&&row.snapshot&&createHash('sha256').update(row.snapshot).digest('hex')===row.snapshot_hash&&Date.parse(row.deadline)>Date.parse(row.locked_at));
  const settled=locked.filter(row=>['won','lost','neutral'].includes(profileOutcome(row)));
@@ -16,6 +20,15 @@ export function integrationProof(receipts:Receipt[],jobs:MemoryJob[],completions
  const stages=[{key:'lock',label:'Lock a forward-looking call',count:locked.length,receiptId:locked[0]?.id},{key:'settle',label:'Verify a settled outcome',count:settled.length,receiptId:settled[0]?.id},{key:'remember',label:'Confirm a Mainnet memory',count:completed.length,receiptId:completed[0]?.prediction_id},{key:'recall',label:'Recall completed memory with SQL citations',count:recalled.length,receiptId:recalled[0]?.receiptId},{key:'adapt',label:'Show a later call’s memory-driven caution',count:recalled.filter(row=>row.adapted).length,receiptId:recalled.find(row=>row.adapted)?.receiptId}];
  const next=!locked.length?'Lock a genuine forward-looking call. Quick captures and old screenshots do not start scored proof.':!settled.length?'Wait for a locked call’s deadline and finalized evidence, then inspect its settlement.':!completed.length?'Open a verified settled receipt and choose Remember outcome. Confirm completion; accepted jobs do not count.':!recalled.length?'Open a receipt and run Recall context to record SQL-linked recall evidence.':!recalled.some(row=>row.adapted)?'Build relevant verified history, then lock a later call and Recall context. Caution proof requires five matching memories completed before that call was locked; never invent calls to reach the threshold.':completed.length<10?'Continue with genuine eligible results until ten distinct Mainnet completions are recorded.':'The stored loop is demonstrated. Still verify restart/recall, official requirements, blog, repository visibility and demo recording.';
  const nextReceiptId=!settled.length?locked[0]?.id:!completed.length?settled[0]?.id:!recalled.length?completed[0]?.prediction_id:locked[0]?.id;
- return {checkedAt:new Date().toISOString(),stages,next,nextReceiptId,mainnetCompleted:completed.length,target:10,completed,recalls:recalled.slice(0,20),sui,locked:locked.length,settled:settled.length,unconfirmedJobs:jobs.length-completed.length};
+ const settlements = settled.map(row => {
+   const evidence = JSON.parse(row.evidence!) as {provider:string;returnPct:string;entry:Candle;exit:Candle};
+   return {
+     receiptId:row.id, asset:row.asset, direction:row.direction, horizon:row.horizon,
+     lockedAt:row.locked_at, deadline:row.deadline, snapshotHash:row.snapshot_hash,
+     outcome:row.outcome, method:row.method, provider:evidence.provider,
+     returnPct:evidence.returnPct, entry:exportCandle(evidence.entry), exit:exportCandle(evidence.exit)
+   };
+ });
+ return {settlements,checkedAt:new Date().toISOString(),stages,next,nextReceiptId,mainnetCompleted:completed.length,target:10,completed,recalls:recalled.slice(0,20),sui,locked:locked.length,settled:settled.length,unconfirmedJobs:jobs.length-completed.length};
 }
 export type IntegrationProof=ReturnType<typeof integrationProof>;

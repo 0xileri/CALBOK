@@ -1,9 +1,17 @@
-'use client';
-import { RefreshCw } from 'lucide-react';
-export type SettlementStatus={healthy:boolean;enabled:boolean;heartbeat:{heartbeat_at:string|null;last_error:string|null}|null;jobs:{prediction_id:string;status:string;attempts:number;next_attempt_at:string;lease_until:string|null;last_error:string|null;updated_at:string}[]};
-export function SettlementMonitor({status,receiptId,onRefresh}:{status?:SettlementStatus;receiptId?:string;onRefresh:()=>void}) {
-  const job=status?.jobs.find(row=>row.prediction_id===receiptId);
-  const heartbeat=status?.heartbeat?.heartbeat_at;
-  const healthy=status?.healthy;
-  return <section className="settlement-monitor" aria-label="Automatic settlement status"><div className="settlement-monitor-heading"><strong>{receiptId?'Settlement job':'Automatic settlement'}</strong><button type="button" className="text-button" onClick={onRefresh}><RefreshCw size={13}/>Refresh status</button></div><p>{!status?'Connect operator access to read worker status.':status.enabled?(healthy?'Worker online · checks every minute.':'Worker enabled · waiting for a recent heartbeat.'):'Background worker is disabled. Manual settlement is available.'}</p>{status?.heartbeat?.last_error&&<p className="settlement-job-error">Worker check failed; the next tick will retry.</p>}{heartbeat&&!receiptId&&<small>Last heartbeat: {new Date(heartbeat).toUTCString()}</small>}{receiptId?(job?<div className="settlement-job"><span className={`badge job-${job.status}`}>{job.status}</span><span>{job.attempts} attempt{job.attempts===1?'':'s'}</span><p>{job.status==='done'?'Settlement recorded.':job.status==='running'?'Checking finalized provider candles.':job.status==='paused'?'Automatic retries paused. Check provider coverage, then use Check settlement to retry.':`Next eligible check: ${new Date(job.next_attempt_at).toUTCString()}`}</p>{job.last_error&&<code>{job.last_error}</code>}</div>:<p>No queued job in the recent status window. The worker will backfill eligible unsettled receipts.</p>):<><div className="settlement-counts">{['queued','running','retry','paused','done'].map(state=><span key={state}><b>{status?status.jobs.filter(row=>row.status===state).length:'-'}</b>{state}</span>)}</div><small>Recent 100 jobs. Settlement starts after the deadline and finalized exit candle. Memory writes remain manual.</small></>}</section>;
-}
+'use client';
+
+import { RefreshCw } from 'lucide-react';
+
+export type SettlementStatus={healthy:boolean;enabled:boolean;heartbeat:{heartbeat_at:string|null;last_error:string|null}|null;jobs:{prediction_id:string;status:string;attempts:number;next_attempt_at:string;lease_until:string|null;last_error:string|null;updated_at:string}[]};
+
+export function SettlementMonitor({status,receiptId,onRefresh}:{status?:SettlementStatus;receiptId?:string;onRefresh:()=>void}) {
+
+  const job=status?.jobs.find(row=>row.prediction_id===receiptId);
+
+  const heartbeat=status?.heartbeat?.heartbeat_at;
+
+  const healthy=status?.healthy;
+
+  return <section className="settlement-monitor" aria-label="Automatic settlement status"><div className="settlement-monitor-heading"><strong>{receiptId?'Settlement job':'Automatic settlement'}</strong><button type="button" className="text-button" onClick={onRefresh}><RefreshCw size={13}/>Refresh status</button></div><p>{!status?'Connect operator access to read worker status.':status.enabled?(healthy?'Worker online · checks every minute.':'Worker enabled · waiting for a recent heartbeat.'):'Background worker is disabled. Manual settlement is available.'}</p>{status?.heartbeat?.last_error&&<p className="settlement-job-error">Worker check failed; the next tick will retry.</p>}{heartbeat&&!receiptId&&<small>Last heartbeat: {new Date(heartbeat).toUTCString()}</small>}{receiptId?(job?<div className="settlement-job"><span className={`badge job-${job.status}`}>{job.status}</span><span>{job.attempts} attempt{job.attempts===1?'':'s'}</span><p>{job.status==='done'?'Settlement recorded.':job.status==='running'?'Checking finalized provider candles.':job.status==='paused'?'Automatic retries paused. Check provider coverage, then use Check settlement to retry.':`Next eligible check: ${new Date(job.next_attempt_at).toUTCString()}`}</p>{job.last_error&&<code>{job.last_error}</code>}</div>:<p>No queued job in the recent status window. The worker will backfill eligible unsettled receipts.</p>):<><div className="settlement-counts">{['queued','running','retry','paused','done'].map(state=><span key={state}><b>{status?status.jobs.filter(row=>row.status===state).length:'-'}</b>{state}</span>)}</div><small>Recent 100 jobs. Settlement starts after the deadline and finalized exit candle. Automatic memory is controlled in Integration settings.</small></>}</section>;
+
+}
