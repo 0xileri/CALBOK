@@ -39,14 +39,20 @@ test('failed submissions, reconciliation, and due polling preserve job identity 
     automaticMemoryStatus();
     setAutomaticMemory(true);
     const refused=Object.assign(new Error('Test connect refused'),{code:'ECONNREFUSED',syscall:'connect'});
-    const result=await rememberReceipt(first,'operator',true,fake({remember:async()=>{throw new TypeError('Test fetch failed',{cause:refused});}}));
+    let firstKey: string | undefined;
+    const result=await rememberReceipt(first,'operator',true,fake({remember:async(_text,options)=>{
+      firstKey=typeof options==='object'?options.idempotencyKey:undefined;
+      assert.ok(firstKey);
+      throw new TypeError('Test fetch failed',{cause:refused});}}));
     assert.equal(result.status,503);
     assert.equal(job(first.id)?.status,'retryable');
     assert.equal(automaticMemoryStatus().used,0);
 
     let submits=0, polls=0;
     const accepted=fake({
-      remember:async()=>{submits++;return {job_id:'test-job-1',status:'pending'};},
+      remember:async(_text,options)=>{
+        assert.deepEqual(options,{idempotencyKey:firstKey});
+        submits++;return {job_id:'test-job-1',status:'pending'};},
       getRememberStatus:async id=>{polls++;return {job_id:id,status:polls===1?'pending':'done',...(polls===1?{}:{blob_id:'test-blob-1'})};}
     });
     const started=await rememberReceipt(first,'operator',true,accepted);
@@ -85,11 +91,12 @@ test('failed submissions, reconciliation, and due polling preserve job identity 
         memory_id:'recovered-job',namespace_id:namespace,blob_id:'recovered-blob',created_at:new Date().toISOString(),
         updated_at:new Date().toISOString(),size:1,agent_id:null,package_id:null,status:'done',end_epoch:null,expires_at:null,importance:null
       }]}),
-      getRememberStatus:async id=>({job_id:id,status:'done',blob_id:'recovered-blob'})
     }));
-    assert.equal(recovered.status,200);
-    assert.equal(job(second.id)?.job_id,'recovered-job');
-    assert.equal(job(second.id)?.blob_id,'recovered-blob');
+    assert.equal(recovered.status,409);
+    assert.match(recovered.message,/Manual review/);
+    assert.equal(job(second.id)?.status,'uncertain');
+    assert.equal(job(second.id)?.job_id,null);
+    assert.equal(job(second.id)?.blob_id,null);
 
     const third=verified('manual timeout');
     await rememberReceipt(third,'operator',false,fake({remember:async()=>{throw new Error('Test timeout');}}));
@@ -101,7 +108,57 @@ test('failed submissions, reconciliation, and due polling preserve job identity 
     await reconcileMemory(third,fake({getRememberStatus:async id=>({job_id:id,status:'failed'})}));
     assert.equal(job(third.id)?.status,'retryable');
     assert.equal(job(third.id)?.job_id,null);
+
+    await testReconciledRefund();
+    await testManualPolling();
   } finally {
     db().close();
   }
 });
+
+async function testReconciledRefund() {
+  const receipt=verified('automatic reconciliation refund');
+  const keys: unknown[]=[];
+  const submit=fake({remember:async(_text,options)=>{
+    keys.push(options);
+    return {job_id:'refund-job',status:'pending'};
+  }});
+  await rememberReceipt(receipt,'operator',true,submit);
+  const budget=automaticMemoryStatus().used;
+  await reconcileMemory(receipt,fake({getRememberStatus:async id=>({job_id:id,status:'failed'})}));
+  assert.equal(automaticMemoryStatus().used,budget-1);
+  assert.equal(job(receipt.id)?.status,'retryable');
+  await automaticMemoryTick(submit);
+  assert.equal(job(receipt.id)?.status,'running');
+  assert.equal(automaticMemoryStatus().used,budget);
+  assert.equal(keys.length,2);
+  assert.deepEqual(keys[0],keys[1]);
+  await reconcileMemory(receipt,fake({getRememberStatus:async id=>({job_id:id,status:'done',blob_id:'refund-blob'})}));
+}
+
+async function testManualPolling() {
+  setAutomaticMemory(false);
+  const receipt=verified('manual pending');
+  const started=await rememberReceipt(receipt,'operator',false,fake({
+    remember:async()=>({job_id:'manual-job',status:'pending'}),
+    waitForRememberJob:async()=>{throw new Error('Test confirmation timeout');}
+  }));
+  assert.equal(started.status,202);
+  const budget=automaticMemoryStatus().used;
+  let polls=0;
+  const provider=fake({getRememberStatus:async id=>{
+    assert.equal(id,'manual-job');
+    polls++;
+    return polls===1 ? {job_id:id,status:'not_found'} : {job_id:id,status:'done',blob_id:'manual-blob'};
+  }});
+  const now=Date.now();
+  await automaticMemoryTick(provider,()=>now);
+  assert.equal(job(receipt.id)?.status,'running');
+  assert.equal(job(receipt.id)?.job_id,'manual-job');
+  await automaticMemoryTick(provider,()=>now+30_000);
+  assert.equal(polls,1);
+  await automaticMemoryTick(provider,()=>now+60_000);
+  assert.equal(polls,2);
+  assert.equal(job(receipt.id)?.blob_id,'manual-blob');
+  assert.equal(automaticMemoryStatus().used,budget);
+}

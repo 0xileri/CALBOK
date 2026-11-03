@@ -29,10 +29,23 @@ function exportCandle({openTime,closeTime,sourceCloseTime,open,high,low,close,ha
   return {openTime,closeTime,sourceCloseTime,open,high,low,close,hash};
 }
 
+function isProofCandle(value: unknown): value is Candle {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candle = value as Record<string,unknown>;
+  return Number.isFinite(candle.openTime) && Number.isFinite(candle.closeTime) &&
+    (candle.sourceCloseTime === undefined || Number.isFinite(candle.sourceCloseTime)) &&
+    [candle.open,candle.high,candle.low,candle.close,candle.hash].every(field=>typeof field==='string');
+}
+
+function isSettlementEvidence(value: Record<string,unknown> | null): value is SettlementEvidence {
+  return value !== null && typeof value.provider==='string' && typeof value.returnPct==='string' &&
+    isProofCandle(value.entry) && isProofCandle(value.exit);
+}
+
 function settlementRecord(row: Receipt) {
   const evidence = parseObject(row.evidence);
-  if (!evidence || !['won','lost','neutral'].includes(profileOutcome(row))) return [];
-  const {provider,returnPct,entry,exit} = evidence as SettlementEvidence;
+  if (!isSettlementEvidence(evidence) || !['won','lost','neutral'].includes(profileOutcome(row))) return [];
+  const {provider,returnPct,entry,exit} = evidence;
   return [{
     receiptId:row.id,asset:row.asset,direction:row.direction,horizon:row.horizon,
     lockedAt:row.locked_at,deadline:row.deadline,snapshotHash:row.snapshot_hash,
@@ -41,7 +54,7 @@ function settlementRecord(row: Receipt) {
 }
 
 export function completedMemoryProofs(receipts: Receipt[], jobs: MemoryJob[], proofs: CompletionProof[]) {
-  const settled = new Set(receipts.filter(row=>isLocked(row)&&['won','lost','neutral'].includes(profileOutcome(row))).map(row=>row.id));
+  const settled = new Set(receipts.filter(row=>isLocked(row) && settlementRecord(row).length > 0).map(row=>row.id));
   const byId = new Map(jobs.map(job=>[job.prediction_id,job]));
   const jobIds = new Set<string>(), blobs = new Set<string>();
   return proofs.filter(proof=>{
@@ -113,19 +126,20 @@ export function integrationProof(receipts: Receipt[], jobs: MemoryJob[], complet
   const invalidSettlementIds = locked.filter(row=>row.evidence!==null && !exportedIds.has(row.id)).map(row=>row.id);
   const completed = completedMemoryProofs(locked,jobs,completions);
   const recalled = recalls.flatMap(record=>replayRecall(record,locked,completed));
-  const adapted = recalled.filter(row=>row.adapted);
+  const citedRecalls = recalled.filter(row=>row.citedIds.length>0);
+  const adapted = citedRecalls.filter(row=>row.adapted);
   const sui = onchain.filter(validSuiRead).map(row=>({id:row.id,at:row.verified_at}));
   const stages = [
     {key:'lock',label:'Lock a forward-looking call',count:locked.length,receiptId:locked[0]?.id},
     {key:'settle',label:'Verify a settled outcome',count:settlements.length,receiptId:settlements[0]?.receiptId},
     {key:'remember',label:'Confirm a Mainnet memory',count:completed.length,receiptId:completed[0]?.prediction_id},
-    {key:'recall',label:'Recall completed memory with SQL citations',count:recalled.length,receiptId:recalled[0]?.receiptId},
+    {key:'recall',label:'Recall completed memory with SQL citations',count:citedRecalls.length,receiptId:citedRecalls[0]?.receiptId},
     {key:'adapt',label:'Show a later call’s memory-driven caution',count:adapted.length,receiptId:adapted[0]?.receiptId}
   ];
   const nextReceiptId = !settlements.length ? locked[0]?.id : !completed.length ? settlements[0]?.receiptId :
-    !recalled.length ? completed[0]?.prediction_id : locked[0]?.id;
+    !citedRecalls.length ? completed[0]?.prediction_id : locked[0]?.id;
   return {
-    settlements,invalidSettlementIds,checkedAt:new Date().toISOString(),stages,next:nextStep(locked,settlements,completed,recalled),
+    settlements,invalidSettlementIds,checkedAt:new Date().toISOString(),stages,next:nextStep(locked,settlements,completed,citedRecalls),
     nextReceiptId,mainnetCompleted:completed.length,target:10,completed,recalls:recalled.slice(0,20),sui,
     locked:locked.length,settled:settlements.length,unconfirmedJobs:jobs.length-completed.length
   };

@@ -2,12 +2,38 @@ import {createHmac,randomBytes,randomInt,randomUUID,timingSafeEqual} from 'node:
 import {db,hash} from './db';
 export type Principal={id:string;role:'operator'|'user';email:string|null};
 export const SESSION_COOKIE='calbok_session';
-export function authSchema(){db().exec(`
-  CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,email TEXT,expires_at INTEGER NOT NULL);
-  CREATE TABLE IF NOT EXISTS login_codes(id TEXT PRIMARY KEY,email TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,used INTEGER NOT NULL DEFAULT 0);
-  CREATE TABLE IF NOT EXISTS login_limits(subject TEXT PRIMARY KEY,window_start INTEGER NOT NULL,count INTEGER NOT NULL);
-`);}
+export function authSchema() {
+  const database = db();
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT NOT NULL,created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,email TEXT,expires_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS login_codes(id TEXT PRIMARY KEY,email TEXT NOT NULL,code_hash TEXT NOT NULL,expires_at INTEGER NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,used INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS login_limits(subject TEXT PRIMARY KEY,window_start INTEGER NOT NULL,count INTEGER NOT NULL);
+  `);
+  migrateAccountEmailIndex();
+}
+
+function migrateAccountEmailIndex() {
+  const database = db();
+  if (database.prepare("SELECT 1 FROM sqlite_schema WHERE name='accounts_member_email'").get()) return;
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    // The owner and an existing member can share an email while the member is promoted.
+    if (database.prepare("SELECT 1 FROM pragma_index_list('accounts') WHERE origin='u'").get()) {
+      database.exec(`
+        ALTER TABLE accounts RENAME TO accounts_legacy;
+        CREATE TABLE accounts(id TEXT PRIMARY KEY,email TEXT NOT NULL,created_at TEXT NOT NULL);
+        INSERT INTO accounts SELECT id,email,created_at FROM accounts_legacy;
+        DROP TABLE accounts_legacy;
+      `);
+    }
+    database.exec("CREATE UNIQUE INDEX IF NOT EXISTS accounts_member_email ON accounts(email) WHERE id<>'operator'");
+    database.exec('COMMIT');
+  } catch (error) {
+    database.exec('ROLLBACK');
+    throw error;
+  }
+}
 function equal(a: string, b: string): boolean {
   return Buffer.byteLength(a)===Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a),Buffer.from(b));
 }
@@ -152,16 +178,15 @@ type LoginCode = {email:string; code_hash:string; expires_at:number; attempts:nu
 function accountForEmail(email: string, now: number): Principal {
   const database = db();
   if (email === ownerEmail()) {
-    database.prepare("INSERT OR IGNORE INTO accounts VALUES ('operator',?,?)").run(email,new Date(now).toISOString());
+    database.prepare(`INSERT INTO accounts VALUES ('operator',?,?)
+      ON CONFLICT(id) DO UPDATE SET email=excluded.email`).run(email,new Date(now).toISOString());
     return {id:'operator',role:'operator',email};
   }
-  const existing = database.prepare('SELECT id FROM accounts WHERE email=?').get(email);
-  if (existing && existing.id !== 'operator') return {id:String(existing.id),role:'user',email};
+  const existing = database.prepare("SELECT id FROM accounts WHERE email=? AND id<>'operator'").get(email);
+  if (existing) return {id:String(existing.id),role:'user',email};
 
   const id = randomUUID();
-  // A legacy owner row can become a member account without moving any receipts.
-  if (existing) database.prepare('UPDATE accounts SET id=? WHERE email=?').run(id,email);
-  else database.prepare('INSERT INTO accounts VALUES (?,?,?)').run(id,email,new Date(now).toISOString());
+  database.prepare('INSERT INTO accounts VALUES (?,?,?)').run(id,email,new Date(now).toISOString());
   return {id,role:'user',email};
 }
 

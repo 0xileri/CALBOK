@@ -73,9 +73,14 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
     process.env.CALBOK_USER_PROVIDER_ACCESS='true';assert.equal((await action(request('actions',alice,{action:'settle',id:b}))).status,404);
     const created=await captureRoute(request('workspace',alice,{...claim,text:'Second private test only',owner_id:'bob'}));assert.equal(created.status,201);assert.equal(listReceipts('alice').length,baseline+2);assert.equal(listReceipts('bob').length,1);
     let code='';const send=async(_email:string,value:string)=>{code=value;};const now=Date.now();
+    // Exercise the migration from the production accounts schema.
+    db().exec(`DROP INDEX accounts_member_email;
+      DROP TABLE accounts;
+      CREATE TABLE accounts(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL);
+      INSERT INTO accounts VALUES ('operator','owner@example.com','2020-01-01T00:00:00.000Z');`);
     const id=await requestCode('alice@example.com',send,now);assert.match(code,/^\d{8}$/);const good=code;
     assert.ok(!JSON.stringify(db().prepare('SELECT * FROM login_codes').all()).includes(good));
-    assert.equal(verifyCode(id,'WRONG',now),null);assert.ok(verifyCode(id,good,now));assert.equal(verifyCode(id,good,now),null);
+    assert.equal(verifyCode(id,'WRONG',now),null);const aliceMember=verifyCode(id,good,now);assert.ok(aliceMember);assert.equal(verifyCode(id,good,now),null);
     const expired=await requestCode('expire@example.com',send,now);assert.equal(verifyCode(expired,code,now+600_000),null);
     const locked=await requestCode('locked@example.com',send,now),lockedCode=code;for(let i=0;i<5;i++)assert.equal(verifyCode(locked,'incorrect',now),null);assert.equal(verifyCode(locked,lockedCode,now),null);
     const owner=await requestCode('owner@example.com',send,now);assert.equal(verifyCode(owner,code,now)?.id,'operator');
@@ -84,11 +89,18 @@ test('sessions isolate journals, jobs and actions; email challenges expire, lock
     process.env.CALBOK_OWNER_EMAIL='  ALICE@EXAMPLE.COM  ';
     const promoted=await requestCode('alice@example.com',send,now);
     assert.deepEqual(verifyCode(promoted,code,now),{id:'operator',role:'operator',email:'alice@example.com'});
+    const ownerAccount=db().prepare("SELECT email,created_at FROM accounts WHERE id='operator'").get();
+    assert.equal(ownerAccount?.email,'alice@example.com');
+    assert.equal(ownerAccount?.created_at,'2020-01-01T00:00:00.000Z');
+    assert.equal(db().prepare('SELECT email FROM accounts WHERE id=?').get(aliceMember.id)?.email,'alice@example.com');
     assert.equal(principal(request('workspace',oldOwnerSession)),null);
     assert.equal(listReceipts('operator')[0].snapshot,oldOwnerSnapshot);
     assert.equal(listReceipts('alice').length,baseline+2);
     const demoted=await requestCode('owner@example.com',send,now);
     assert.equal(verifyCode(demoted,code,now)?.role,'user');
+    process.env.CALBOK_OWNER_EMAIL='owner@example.com';
+    const returnedMember=await requestCode('alice@example.com',send,now);
+    assert.deepEqual(verifyCode(returnedMember,code,now),aliceMember);
     assert.equal((await action(request('actions',alice,{action:'reconcile',id:a}))).status,403);
     const previousEnv=process.env.NODE_ENV, previousToken=process.env.CALBOK_ADMIN_TOKEN;
     try {
