@@ -119,6 +119,20 @@ function nextStep(locked: Receipt[], settlements: ReturnType<typeof settlementRe
   return 'The stored loop is demonstrated. Still verify restart/recall, official requirements, blog, repository visibility and demo recording.';
 }
 
+export function memoryGroupProgress(receipts: Receipt[], completed: CompletionProof[]) {
+  const completedIds = new Set(completed.map(row=>row.prediction_id));
+  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number}>();
+  for (const receipt of receipts.filter(isLocked)) {
+    const {caller,asset,direction,horizon} = receipt;
+    const key = JSON.stringify([caller.trim().toLowerCase(),asset,direction,horizon]);
+    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0};
+    const outcome = profileOutcome(receipt);
+    if (completedIds.has(receipt.id) && (outcome==='won' || outcome==='lost')) group.count++;
+    groups.set(key,group);
+  }
+  return [...groups.values()].sort((a,b)=>b.count-a.count);
+}
+
 export function integrationProof(receipts: Receipt[], jobs: MemoryJob[], completions: CompletionProof[], recalls: RecallProof[], onchain: OnchainProof[]) {
   const locked = receipts.filter(isLocked);
   const settlements = locked.flatMap(settlementRecord);
@@ -139,7 +153,7 @@ export function integrationProof(receipts: Receipt[], jobs: MemoryJob[], complet
   const nextReceiptId = !settlements.length ? locked[0]?.id : !completed.length ? settlements[0]?.receiptId :
     !citedRecalls.length ? completed[0]?.prediction_id : locked[0]?.id;
   return {
-    settlements,invalidSettlementIds,checkedAt:new Date().toISOString(),stages,next:nextStep(locked,settlements,completed,citedRecalls),
+    settlements,invalidSettlementIds,groups:memoryGroupProgress(locked,completed),checkedAt:new Date().toISOString(),stages,next:nextStep(locked,settlements,completed,citedRecalls),
     nextReceiptId,mainnetCompleted:completed.length,target:10,completed,recalls:recalled.slice(0,20),sui,
     locked:locked.length,settled:settlements.length,unconfirmedJobs:jobs.length-completed.length
   };

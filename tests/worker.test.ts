@@ -7,7 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 const directory=mkdtempSync(join(tmpdir(),'calbok-worker-test-'));
 process.env.CALBOK_DB_PATH=join(directory,'worker.sqlite');
-const {db,capture,hash}=await import('../lib/db');
+const {db,capture,hash,listReceipts}=await import('../lib/db');
 const {runSettlement,workerTick}=await import('../lib/settlement-worker');
 const {ProviderError}=await import('../lib/providers');
 const now=Math.floor(Date.now()/60_000)*60_000;
@@ -25,6 +25,15 @@ test('durable worker: deadlines, overlapping checks, retries, pause, and lease r
     let calls=0;
     const futureResult=await runSettlement(future,{clock,fetchCandles:async()=>{calls++;return [];}});
     assert.match(futureResult.message,/deadline/);assert.equal(calls,0);
+
+    const {logInbox}=await import('../lib/call-inbox');
+    const claim={caller:'TEST OWNER',text:'Synthetic promotion test',asset:'BTC',direction:'bullish',horizon:'24h',sourceUrl:''} as const;
+    const logged=logInbox('operator',{...claim,requestId:randomUUID()});
+    assert.throws(()=>capture(claim,'another-owner',undefined,logged.id),/INBOX_NOT_FOUND/);
+    const promoted=capture(claim,'operator',undefined,logged.id);
+    const promotedReceipt=listReceipts('operator').find(row=>row.id===promoted)!;
+    assert.equal(promotedReceipt.inbox_id,logged.id);
+    assert.equal(Date.parse(promotedReceipt.deadline)-Date.parse(promotedReceipt.locked_at),86_400_000);
 
     const first=due();
     let release!:()=>void;

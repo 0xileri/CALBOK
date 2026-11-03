@@ -61,3 +61,61 @@ test('a proof timestamp cannot backdate a memory that finished after the target 
   assert.deepEqual(mismatched,[]);
   assert.deepEqual(recallComparison(target,[source,target],mismatched,[source.id]).citedIds,[]);
 });
+
+import {matchingPriorMemory} from '../lib/receipt-recall';
+
+test('automatic recall only considers memories available before a matching lock',()=>{
+  const prior=receipt('CB-prior');
+  const target={...prior,id:'CB-new',locked_at:'1970-01-04T00:00:00.000Z'};
+  assert.equal(matchingPriorMemory(target,prior,'1970-01-03T00:00:00.000Z'),true);
+  assert.equal(matchingPriorMemory(target,prior,target.locked_at),false);
+  for(const change of [{caller:'OTHER'},{asset:'ETH'},{direction:'bearish'},{horizon:'7d'}]) {
+    assert.equal(matchingPriorMemory(target,{...prior,...change},'1970-01-03T00:00:00.000Z'),false);
+  }
+});
+
+test('caution progress groups exact markets and counts verified completed outcomes',()=>{
+  const prior=receipt('CB-progress');
+  const pending={...receipt('CB-progress-pending'),outcome:null,evidence:null,method:null};
+  const other={...pending,id:'CB-progress-other',direction:'bearish'};
+  const proof={prediction_id:prior.id,job_id:'job',blob_id:'blob',network:'mainnet',completed_at:'1970-01-03T00:00:00.000Z'};
+  const result=integrationProof([prior,pending,other],[{...proof,status:'done',namespace:'test'}],[proof],[],[]);
+  assert.deepEqual(result.groups.map(group=>[group.direction,group.count]),[['bullish',1],['bearish',0]]);
+});
+import {mkdtempSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {db} from '../lib/db';
+import {automaticRecall} from '../lib/receipt-recall';
+import {proofSchema} from '../lib/integration-proof-store';
+import {memoryClient} from '../lib/providers';
+
+test('lock and worker recall share a durable claim and store one cited review',async()=>{
+  process.env.CALBOK_DB_PATH=join(mkdtempSync(join(tmpdir(),'calbok-auto-recall-')),'test.sqlite');
+  process.env.MEMWAL_PRIVATE_KEY='synthetic-test-only';
+  process.env.MEMWAL_ACCOUNT_ID='synthetic-test-only';
+  const database=db();
+  try {
+    proofSchema();
+    const prior=receipt('CB-auto-prior');
+    const target={...receipt('CB-auto-target'),locked_at:'1970-01-04T00:00:00.000Z',deadline:'1970-01-05T00:00:00.000Z'};
+    for(const row of [prior,target]) {
+      database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(row.id,row.caller,row.asset,row.direction,row.horizon,row.text,row.source_url,row.locked_at,row.deadline,row.id,row.snapshot_hash,row.provenance,row.snapshot!);
+    }
+    const completedAt='1970-01-03T00:00:00.000Z';
+    database.prepare('INSERT INTO settlements VALUES (?,?,?,?,?)').run(prior.id,prior.outcome,prior.evidence,prior.method,completedAt);
+    database.prepare("INSERT INTO memory_jobs(prediction_id,namespace,status,job_id,blob_id,completed_at) VALUES (?,?,'done',?,?,?)").run(prior.id,'test','job','blob',completedAt);
+    database.prepare("INSERT INTO memory_completion_proofs VALUES (?,?,?,'mainnet',?)").run(prior.id,'job','blob',completedAt);
+    let reads=0;
+    const provider=async()=>({recall:async()=>{
+      reads++;
+      return {results:[{text:JSON.stringify({predictionId:prior.id}),blob_id:'blob'}]};
+    }}) as unknown as Awaited<ReturnType<typeof memoryClient>>;
+    const [review]=await Promise.all([automaticRecall('operator',target.id,provider),automaticRecall('operator',undefined,provider)]);
+    assert.deepEqual(review?.citedIds,[prior.id]);
+    assert.equal(reads,1);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM recall_proofs WHERE prediction_id=?').get(target.id)?.n,1);
+  } finally {
+    database.close();
+  }
+});
