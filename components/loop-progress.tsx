@@ -1,4 +1,5 @@
 'use client';
+import {PathToCaution} from './path-to-caution';
 import {useEffect,useState} from 'react';
 import type {IntegrationProof} from '@/lib/integration-proof';
 
@@ -30,10 +31,7 @@ export function LoopProgress({receipts}:{receipts:Receipt[]}) {
     </li>)}</ul>:<p>No upcoming deadlines.</p>}
     {!proof?<p>{failed?'Progress unavailable.':'Loading progress…'}</p>:<>
       <ul>{proof.stages.map(stage=><li key={stage.key}>{stage.label} · {stage.count}</li>)}</ul>
-      <h4>Verified memories toward caution</h4><p>Win rates use completed, verified wins and losses in each exact group. Neutral outcomes do not count toward the minimum of five. Reaching five makes a group eligible for review, not a guaranteed caution.</p>
-      {proof.groups.length?<ul>{proof.groups.map(group=><li key={group.key}>
-        {group.caller} · {group.asset} · {group.direction} · {group.horizon} · {group.count}/5 · win rate {group.winRate===null?'—':group.winRate+'%'}{group.closest?' · Closest to caution eligibility':''}
-      </li>)}</ul>:<p>No locked calls yet.</p>}
+      <PathToCaution groups={proof.groups}/>
     </>}
   </section>;
 }

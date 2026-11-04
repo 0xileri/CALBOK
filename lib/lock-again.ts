@@ -11,3 +11,7 @@ export function lockAgainSeed(receipt:Receipt):{fields:DraftFields;asset:Asset}|
   const fields=draftFields.parse({caller:receipt.caller,text:receipt.text,asset:receipt.asset,direction:receipt.direction,horizon:receipt.horizon,sourceUrl:receipt.source_url});
   return {fields,asset};
 }
+
+export function sameGroupRepeatSeed(receipt:Receipt,job?:{prediction_id:string;status:string;blob_id:string|null}) {
+  return job?.prediction_id===receipt.id&&job.status==='done'&&!!job.blob_id?lockAgainSeed(receipt):null;
+}

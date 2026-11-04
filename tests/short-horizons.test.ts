@@ -15,7 +15,7 @@ test('supported horizons persist their exact deadline and queue boundary',()=>{
     const receipt=listReceipts('operator').find(row=>row.id===id)!;
     assert.equal(Date.parse(receipt.deadline)-Date.parse(receipt.locked_at),hours*3600000);
     const job=db().prepare('SELECT next_attempt_at FROM settlement_jobs WHERE prediction_id=?').get(id);
-    assert.equal(Date.parse(String(job?.next_attempt_at)),Date.parse(receipt.deadline)+60000);
+    assert.equal(Date.parse(String(job?.next_attempt_at)),Date.parse(receipt.deadline));
   }
 });
 

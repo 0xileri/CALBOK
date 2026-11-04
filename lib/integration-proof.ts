@@ -1,3 +1,4 @@
+import {exitCandleFinalizedAt} from './settlement-timing';
 import {createHash} from 'node:crypto';
 import type {Receipt} from './db';
 import type {MemoryJob} from './memory-ledger';
@@ -121,16 +122,17 @@ function nextStep(locked: Receipt[], settlements: ReturnType<typeof settlementRe
 
 export function memoryGroupProgress(receipts: Receipt[], completed: CompletionProof[]) {
   const completedIds = new Set(completed.map(row=>row.prediction_id));
-  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number;wins:number;losses:number}>();
+  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number;wins:number;losses:number;nextDeadline:string|null}>();
   for (const receipt of receipts.filter(isLocked)) {
     const {caller,asset,direction,horizon} = receipt;
     const key = JSON.stringify([caller.trim().toLowerCase(),asset,direction,horizon]);
-    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0,wins:0,losses:0};
+    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0,wins:0,losses:0,nextDeadline:null};
     const outcome = profileOutcome(receipt);
     if (completedIds.has(receipt.id) && (outcome==='won' || outcome==='lost')) {group.count++;if(outcome==='won')group.wins++;else group.losses++;}
+    if((!receipt.outcome||receipt.outcome==='pending') && Number.isFinite(Date.parse(receipt.deadline)) && (!group.nextDeadline||Date.parse(receipt.deadline)<Date.parse(group.nextDeadline)))group.nextDeadline=receipt.deadline;
     groups.set(key,group);
   }
-  const result=[...groups.values()].map(group=>({...group,winRate:group.count?(group.wins/group.count*100).toFixed(1):null,remaining:Math.max(0,5-group.count)}));
+  const result=[...groups.values()].map(group=>({...group,winRate:group.count?(group.wins/group.count*100).toFixed(1):null,remaining:Math.max(0,5-group.count),nextSettlementAt:group.nextDeadline?new Date(exitCandleFinalizedAt(Date.parse(group.nextDeadline))).toISOString():null}));
   const closest=Math.min(...result.filter(group=>group.count>0).map(group=>group.remaining));
   return result.map(group=>({...group,closest:group.count>0&&group.remaining===closest})).sort((a,b)=>a.remaining-b.remaining||b.count-a.count||a.key.localeCompare(b.key));
 }

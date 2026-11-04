@@ -83,7 +83,8 @@ export async function assetCandles(asset:string,boundary:number):Promise<Candle[
   if (token) return gmgnCandles(token.chain,token.address,boundary);
   try {return [await priceCandle(asset,boundary)];}
   catch (error) {
-    if (!(error instanceof ProviderError) || !['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_HTTP_404'].includes(error.code)) throw error;
+    const finalized=Date.now()>=Math.ceil(boundary/60_000)*60_000+60_000;
+    if (!(error instanceof ProviderError) || (!['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_HTTP_404'].includes(error.code) && !(finalized&&error.code==='TATUM_CANDLE_NOT_YET_AVAILABLE'))) throw error;
     try {return await coinbaseCandles(asset,boundary);}
     catch (fallbackError) {
       if (!(fallbackError instanceof ProviderError) || !['COINBASE_MARKET_UNSUPPORTED','COINBASE_BOUNDARY_UNAVAILABLE'].includes(fallbackError.code)) throw fallbackError;

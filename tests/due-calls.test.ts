@@ -8,6 +8,7 @@ test('deadline list excludes settled calls, sorts deadlines and waits for finali
   assert.deepEqual(dueCalls(rows,99_999).map(row=>[row.receipt.id,row.state]),[['due','upcoming'],['later','upcoming']]);
   assert.equal(dueCalls(rows,100_000)[0].state,'finalizing');
   assert.equal(dueCalls(rows,159_999)[0].state,'finalizing');
-  assert.equal(dueCalls(rows,160_000)[0].state,'eligible');
+  assert.equal(dueCalls(rows,160_000)[0].state,'finalizing');
+  assert.equal(dueCalls(rows,180_000)[0].state,'eligible');
   assert.equal(dueCalls([{...rows[0],deadline:'invalid'}],0)[0].state,'unknown');
 });

@@ -46,6 +46,7 @@ export function db() {
     CREATE TRIGGER IF NOT EXISTS freeze_prediction_owner BEFORE UPDATE ON prediction_owners BEGIN SELECT RAISE(ABORT,'Receipt ownership is immutable'); END;
     CREATE TRIGGER IF NOT EXISTS keep_prediction_owner BEFORE DELETE ON prediction_owners BEGIN SELECT RAISE(ABORT,'Receipt ownership is immutable'); END;`);
   instance.exec('CREATE TABLE IF NOT EXISTS receipt_inbox_links (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), inbox_id TEXT NOT NULL REFERENCES call_inbox(id))');
+  if(!instance.prepare("SELECT 1 FROM pragma_table_info('settlement_jobs') WHERE name='first_checked_at'").get())instance.exec('ALTER TABLE settlement_jobs ADD COLUMN first_checked_at TEXT');
   return instance;
 }
 export type Receipt = {inbox_id?:string|null;snapshot?:string;id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
@@ -54,8 +55,16 @@ export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("S
 export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}
 export function registerAsset(asset:Asset){db().prepare('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?)').run(asset.id,asset.symbol,asset.name,asset.provider,asset.chain||null,asset.address||null,asset.discoveredAt||new Date().toISOString());}
 export function knownAsset(id:string):Asset|null{const row=db().prepare('SELECT * FROM assets WHERE id=?').get(id) as Record<string,string>|undefined;return row?{id:row.id,symbol:row.symbol,name:row.name,provider:row.provider as Asset['provider'],chain:row.chain,address:row.address}:null;}
-export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string) {
-  if(repeatOf){const prior=listReceipts(ownerId).find(row=>row.id===repeatOf);if(!prior||!lockAgainSeed(prior))throw new Error('VERIFIED_PRIOR_RECEIPT_REQUIRED');}
+export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string,sameGroup=false) {
+  if(sameGroup&&!repeatOf)throw new Error('PRIOR_RECEIPT_REQUIRED');
+  if(repeatOf){
+    const prior=listReceipts(ownerId).find(row=>row.id===repeatOf);
+    if(!prior||!lockAgainSeed(prior))throw new Error('VERIFIED_PRIOR_RECEIPT_REQUIRED');
+    if(sameGroup){
+      const memory=db().prepare("SELECT 1 FROM memory_jobs WHERE prediction_id=? AND status='done' AND blob_id IS NOT NULL AND blob_id<>''").get(repeatOf);
+      if(!memory||!['caller','asset','direction','horizon'].every(key=>claim[key as keyof Claim]===prior[key as keyof Receipt]))throw new Error('COMPLETED_MEMORY_AND_SAME_GROUP_REQUIRED');
+    }
+  }
   db().exec('CREATE TABLE IF NOT EXISTS receipt_repeat_links (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id),original_id TEXT NOT NULL REFERENCES predictions(id))');
   const assetMetadata=knownAsset(claim.asset);
   if(parseGmgnAssetId(claim.asset)&&!assetMetadata)throw new Error('GMGN token must be discovered and selected first');
@@ -71,7 +80,7 @@ export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inbo
     if (inboxId) database.prepare('INSERT INTO receipt_inbox_links VALUES (?,?)').run(id,inboxId);
     database.prepare('INSERT INTO prediction_owners VALUES (?,?)').run(id,ownerId);
     database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_locked',hash(snapshot),now.toISOString());
-    database.prepare('INSERT INTO settlement_jobs (prediction_id,next_attempt_at,updated_at) VALUES (?,?,?)').run(id,new Date(Date.parse(deadline)+60_000).toISOString(),now.toISOString());
+    database.prepare('INSERT INTO settlement_jobs (prediction_id,next_attempt_at,updated_at) VALUES (?,?,?)').run(id,deadline,now.toISOString());
     if(draftVersion!==undefined)database.prepare("UPDATE call_drafts SET fields='null',version=version+1,updated_at=? WHERE owner_id=? AND version=?").run(now.toISOString(),ownerId,draftVersion);
     database.exec('COMMIT'); return id;
   } catch(error) { database.exec('ROLLBACK'); throw error; }

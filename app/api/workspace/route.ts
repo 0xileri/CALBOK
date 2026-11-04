@@ -1,6 +1,6 @@
 import {entryPriceSchema} from '@/lib/entry-price';
 import {proofSchema} from '@/lib/integration-proof-store';
-import {automaticRecall} from '@/lib/receipt-recall';
+import {automaticRecall,verifiedRecallReview,memoryHistory} from '@/lib/receipt-recall';
 import {z} from 'zod';
 import {principal} from '@/lib/auth';
 import { authorize, body, rateLimit } from '@/lib/http';
@@ -16,8 +16,9 @@ export async function GET(request:Request) {
   proofSchema();
   entryPriceSchema();
   const entryPrices=db().prepare("SELECT e.* FROM entry_prices e JOIN prediction_owners o ON o.prediction_id=e.prediction_id WHERE o.owner_id=?").all(user.id);
-  const recallReviews = Object.fromEntries(db().prepare('SELECT prediction_id,review FROM recall_proofs WHERE owner_id=? ORDER BY created_at,rowid').all(user.id).flatMap(row => {
-    try { return [[String(row.prediction_id),JSON.parse(String(row.review))]]; } catch { return []; }
+  const history=memoryHistory(user.id);
+  const recallReviews = Object.fromEntries(db().prepare('SELECT prediction_id,review,created_at FROM recall_proofs WHERE owner_id=? ORDER BY created_at,rowid').all(user.id).flatMap(row => {
+    try {const receipt=receipts.find(r=>r.id===row.prediction_id);if(!receipt)return [];const review=verifiedRecallReview(receipt,user.id,JSON.parse(String(row.review)),String(row.created_at),history);return review?[[receipt.id,review]]:[];} catch { return []; }
   }));
   const status=settlementStatus();status.jobs=status.jobs.filter(job=>ids.has(job.prediction_id));
   return Response.json({receipts,entryPrices,recallReviews,settlement:status,memoryJobs:db().prepare("SELECT m.* FROM memory_jobs m JOIN predictions p ON p.id=m.prediction_id LEFT JOIN prediction_owners o ON o.prediction_id=p.id WHERE COALESCE(o.owner_id,'operator')=?").all(user.id),onchain:user.role==='operator'?db().prepare('SELECT * FROM onchain_evidence').all():[],providers:configuration()},{headers:{'Cache-Control':'no-store'}});
@@ -27,11 +28,11 @@ export async function POST(request:Request) {
   if(rateLimit())return Response.json({error:'Please wait a minute before trying again.'},{status:429});
   try {
     const input=await body(request),parsed=claimSchema.safeParse(input);
-    const {draftVersion,inboxId,repeatOf}=z.object({draftVersion:z.number().int().positive().optional(),inboxId:z.string().regex(/^LOG-[a-zA-Z0-9-]{1,100}$/).optional(),repeatOf:z.string().regex(/^CB-[a-zA-Z0-9-]{1,100}$/).optional()}).parse(input);
+    const {draftVersion,inboxId,repeatOf,sameGroup}=z.object({draftVersion:z.number().int().positive().optional(),inboxId:z.string().regex(/^LOG-[a-zA-Z0-9-]{1,100}$/).optional(),repeatOf:z.string().regex(/^CB-[a-zA-Z0-9-]{1,100}$/).optional(),sameGroup:z.boolean().optional()}).parse(input);
     if(!parsed.success)return Response.json({error:parsed.error.issues.map(i=>i.message).join(' ')},{status:400});
     if(parseGmgnAssetId(parsed.data.asset)&&!knownAsset(parsed.data.asset))return Response.json({error:'Search for and select this GMGN token first so its identity can be preserved.'},{status:400});
     const owner = principal(request)!.id;
-    const id = capture(parsed.data,owner,draftVersion,inboxId,repeatOf);
+    const id = capture(parsed.data,owner,draftVersion,inboxId,repeatOf,sameGroup);
     const review = await automaticRecall(owner,id).catch(() => undefined);
     return Response.json({id,review},{status:201});
   } catch(error) {

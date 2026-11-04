@@ -1,3 +1,4 @@
+import {exitCandleFinalizedAt} from './settlement-timing';
 import {coinbaseCandles} from './coinbase-pricing';
 import {binanceCandles} from './binance-pricing';
 import {entryPriceTick} from './entry-price';
@@ -10,12 +11,13 @@ import {assetCandles,ProviderError} from './providers';
 import {parseGmgnAssetId} from './assets';
 
 const LEASE_MS=120_000,MAX_ATTEMPTS=8;
-export type SettlementJob={prediction_id:string;status:string;attempts:number;next_attempt_at:string;lease_until:string|null;last_error:string|null;updated_at:string};
+export type SettlementJob={prediction_id:string;status:string;attempts:number;next_attempt_at:string;lease_until:string|null;last_error:string|null;updated_at:string;first_checked_at:string|null};
 type Options={force?:boolean;clock?:()=>number;fetchCandles?:(asset:string,boundary:number)=>Promise<Candle[]>};
 export function syncSettlementJobs(now=Date.now()) {
   db().prepare(`INSERT OR IGNORE INTO settlement_jobs(prediction_id,next_attempt_at,updated_at)
-    SELECT p.id,strftime('%Y-%m-%dT%H:%M:%fZ',p.deadline,'+1 minute'),? FROM predictions p
+    SELECT p.id,p.deadline,? FROM predictions p
     LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL`).run(new Date(now).toISOString());
+  db().prepare(`UPDATE settlement_jobs SET next_attempt_at=(SELECT p.deadline FROM predictions p WHERE p.id=prediction_id) WHERE status='queued' AND attempts=0 AND next_attempt_at>(SELECT p.deadline FROM predictions p WHERE p.id=prediction_id)`).run();
   db().prepare(`UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=?
     WHERE status!='done' AND EXISTS(SELECT 1 FROM settlements s WHERE s.prediction_id=settlement_jobs.prediction_id)`).run(new Date(now).toISOString());
   db().prepare(`UPDATE settlement_jobs SET status='paused',lease_token=NULL,lease_until=NULL,last_error='LEASE_RECOVERY_LIMIT_REACHED',updated_at=?
@@ -26,12 +28,19 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
   if(!receipt)return {message:'Receipt not found.'};
   const now=clock(),iso=new Date(now).toISOString();
   if(receipt.outcome){db().prepare("UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=? WHERE prediction_id=?").run(iso,id);return {message:'This receipt already has an immutable settlement.'};}
-  if(now<Date.parse(receipt.deadline)+60_000)return {message:'Pending: the deadline and exit candle have not finalized.'};
+  if(now<Date.parse(receipt.deadline))return {message:'Pending: the deadline and exit candle have not finalized.'};
   syncSettlementJobs(now);
+  const finalizedAt=exitCandleFinalizedAt(Date.parse(receipt.deadline));
+  if(now<finalizedAt){
+    db().prepare(`UPDATE settlement_jobs SET first_checked_at=COALESCE(first_checked_at,?),status='retry',next_attempt_at=?,last_error='EXIT_CANDLE_NOT_FINALIZED',updated_at=?
+      WHERE prediction_id=? AND (status IN ('queued','retry') OR ?=1) AND (lease_until IS NULL OR lease_until<=?)`)
+      .run(iso,new Date(finalizedAt).toISOString(),iso,id,Number(force),iso);
+    return {message:'Pending: deadline observed; waiting for the finalized exit candle.'};
+  }
   const token=randomUUID();
   const job=db().prepare(`UPDATE settlement_jobs SET status='running',attempts=CASE WHEN status='paused' THEN 1 ELSE attempts+1 END,
-    lease_token=?,lease_until=?,updated_at=? WHERE prediction_id=? AND (lease_until IS NULL OR lease_until<=?)
-    AND (?=1 OR (status IN ('queued','retry','running') AND next_attempt_at<=?)) RETURNING attempts`).get(token,new Date(now+LEASE_MS).toISOString(),iso,id,iso,force?1:0,iso) as {attempts:number}|undefined;
+    first_checked_at=COALESCE(first_checked_at,?),lease_token=?,lease_until=?,updated_at=? WHERE prediction_id=? AND (lease_until IS NULL OR lease_until<=?)
+    AND (?=1 OR (status IN ('queued','retry','running') AND next_attempt_at<=?)) RETURNING attempts`).get(iso,token,new Date(now+LEASE_MS).toISOString(),iso,id,iso,force?1:0,iso) as {attempts:number}|undefined;
   if(!job)return {message:'Settlement is already running, awaiting its next retry, or paused for review.'};
   function defer(code:string) {
     const time=clock(),paused=['TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_STALE_CANDLE'].includes(code) || job!.attempts>=MAX_ATTEMPTS;
@@ -94,7 +103,17 @@ export function settlementStatus() {
   const database=db();
   const heartbeat=database.prepare('SELECT heartbeat_at,last_error FROM worker_state WHERE id=1').get() as {heartbeat_at:string|null;last_error:string|null}|undefined;
   return {healthy:!!heartbeat?.heartbeat_at && Date.now()-Date.parse(heartbeat.heartbeat_at)<180_000,enabled:process.env.CALBOK_WORKER_ENABLED==='true',heartbeat:heartbeat||null,
-    jobs:database.prepare('SELECT prediction_id,status,attempts,next_attempt_at,lease_until,last_error,updated_at FROM settlement_jobs ORDER BY updated_at DESC LIMIT 100').all() as unknown as SettlementJob[]};
+    jobs:database.prepare('SELECT prediction_id,status,attempts,next_attempt_at,lease_until,last_error,updated_at,first_checked_at FROM settlement_jobs ORDER BY updated_at DESC LIMIT 100').all() as unknown as SettlementJob[]};
+}
+
+export function observeDueDeadlines(now=Date.now()){
+  const iso=new Date(now).toISOString();
+  // Acknowledge every due deadline cheaply, even when the bounded provider batch is full.
+  db().prepare(`UPDATE settlement_jobs SET first_checked_at=COALESCE(first_checked_at,?)
+      WHERE status IN ('queued','retry','running') AND next_attempt_at<=?
+      AND EXISTS(SELECT 1 FROM predictions p LEFT JOIN prediction_owners o ON o.prediction_id=p.id
+        WHERE p.id=settlement_jobs.prediction_id AND p.deadline<=? AND (COALESCE(o.owner_id,'operator')='operator' OR ?=1))`)
+      .run(iso,iso,iso,process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0);
 }
 
 export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Options={}) {
@@ -107,10 +126,11 @@ export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Opti
     requeueStaleSettlementJobs(now);
     syncSettlementJobs(now);
     backfillSettledMemories();
+    observeDueDeadlines(now);
     const due=database.prepare(`SELECT j.prediction_id FROM settlement_jobs j JOIN predictions p ON p.id=j.prediction_id
       LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND j.status IN ('queued','retry','running')
       AND j.next_attempt_at<=? AND (j.lease_until IS NULL OR j.lease_until<=?)
-      AND p.deadline<=? AND (COALESCE((SELECT owner_id FROM prediction_owners WHERE prediction_id=p.id),'operator')='operator' OR ?=1) ORDER BY j.next_attempt_at,j.prediction_id LIMIT 3`).all(iso,iso,new Date(now-60_000).toISOString(),process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0) as {prediction_id:string}[];
+      AND p.deadline<=? AND (COALESCE((SELECT owner_id FROM prediction_owners WHERE prediction_id=p.id),'operator')='operator' OR ?=1) ORDER BY j.next_attempt_at,j.prediction_id LIMIT 3`).all(iso,iso,iso,process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0) as {prediction_id:string}[];
     for (const job of due) {
       const time = clock();
       const heartbeat = new Date(time).toISOString();
@@ -132,7 +152,7 @@ export function startSettlementWorker() {
   const shared=globalThis as typeof globalThis & {calbokSettlementWorker?:ReturnType<typeof setInterval>};
   if(shared.calbokSettlementWorker)return;
   let running=false;
-  const tick=async()=>{if(running)return;running=true;try{await workerTick();}catch{console.error('Settlement worker tick failed.');}finally{running=false;}};
+  const tick=async()=>{try{observeDueDeadlines();}catch{console.error('Settlement deadline observation failed.');return;}if(running)return;running=true;try{await workerTick();}catch{console.error('Settlement worker tick failed.');}finally{running=false;}};
   shared.calbokSettlementWorker=setInterval(()=>void tick(),60_000);
   shared.calbokSettlementWorker.unref();
   void tick();
