@@ -1,10 +1,10 @@
-# Actual readiness — 3 November 2026
+# Actual readiness — 4 November 2026
 
-This is a deployed private-beta workspace, not a completed submission. The 3 November production check confirmed **one locked call and one verified settlement**. Public registration remains disabled. Missing proof is not a provider failure.
+Public email sign-in is enabled (confirmed through production /api/auth). Earlier baseline: **32 settled, 32 Mainnet memories, recall 1, caution pending**. The 4 November production recheck now shows **34 locks, 33 settled, 32 Mainnet memories, recall 1, caution 0**. Counts change as real jobs finish; see [public proof](https://calbok.xyz/proof). Missing proof is not a provider failure.
 
 ## Next action for the owner
 
-**Confirm the first Walrus Mainnet memory**, then check context on the receipt. The owner can enable automatic writes in Integration settings.
+**Demonstrate a later same-group call recalling completed memories and, when five verified wins/losses produce a win rate below 40%, a genuine caution.** Also verify restart/recall and record the demo.
 
 | Requirement | Status / proof |
 | --- | --- |
@@ -13,12 +13,12 @@ This is a deployed private-beta workspace, not a completed submission. The 3 Nov
 | Immutable prospective SQL capture | Implemented and tested; first genuine live receipt locked |
 | Deterministic directional settlement | Reproducibility tested; historical provider samples checked previously. First genuine live lock → deadline → settlement verified |
 | Relevant Tatum Sui Mainnet read | Prior real gRPC GetCoinInfo proof recorded in evidence document. Integration proof screen counts only validated metadata actually stored in this workspace |
-| Walrus Mainnet remember → done → recall | Authenticated recall previously passed; **no completed write/recall round trip yet** |
-| 10 completed Mainnet memories | **0 / 10. Owner action pending**. Accepted/running jobs do not count |
+| Walrus Mainnet remember → done → recall | 32 confirmed Mainnet completions and 1 SQL-cited recall; live caution pending |
+| 10 completed Mainnet memories | **32 / 10 confirmed** at the dated check. Accepted/running jobs do not count |
 | Replayable adaptation | Policy tested; live demonstration pending. At least five relevant memories must have completed before a later target call was locked for caution proof |
-| Integration proof screen | Implemented: read-only owner-scoped progress, job/blob completion evidence, persisted SQL-linked recall, side-by-side comparison, JSON export, next action and explicit manual requirements. No provider calls are triggered by viewing it |
+| Integration proof screen | Implemented: read-only owner-scoped progress plus public /proof with allowlisted stage counts and settlement fields, job/blob completion evidence, persisted SQL-linked recall, side-by-side comparison, JSON export, next action and explicit manual requirements. No provider calls are triggered by viewing it |
 | Durable worker | Leases, retries, heartbeat and bounded settlement batches implemented/tested. Owner opt-in enables up to ten automatic Mainnet write attempts |
-| Deployment and access | Primary workspace at https://calbok.xyz via `CALBOK_PUBLIC_ORIGIN`, with https://calbok.up.railway.app in `CALBOK_ADDITIONAL_ORIGINS`. Private journal APIs, persistent volume, GitHub deployments, email sessions and account controls. Public signup/member provider spending remain disabled |
+| Deployment and access | Primary workspace at https://calbok.xyz via `CALBOK_PUBLIC_ORIGIN`, with https://calbok.up.railway.app in `CALBOK_ADDITIONAL_ORIGINS`. Private journal APIs, persistent volume, GitHub deployments, email sessions and account controls. Public email sign-in enabled; member provider access requires CALBOK_USER_PROVIDER_ACCESS=true, with 10 locks/hour and 10 writes/UTC day per member |
 | Public homepage / branding | Implemented with workflow, privacy limits, brand kit and sign-in |
 | Public repository and blog | Source on private 0xileri/CALBOK; public visibility and published blog not verified |
 | Demo video | Pending; script outline in demo-script.md |

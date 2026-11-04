@@ -27,7 +27,7 @@ Set these runtime variables for owner email login.
 - `CALBOK_OWNER_EMAIL`: lowercase owner address, for example `owner@example.com`.
 - `CALBOK_SESSION_SECRET`: at least 32 random characters; format example `<64 random hexadecimal characters>` (generate locally; do not use a literal example).
 
-Set `CALBOK_PUBLIC_SIGNIN_ENABLED=false` and `CALBOK_USER_PROVIDER_ACCESS=false` for this private workspace.
+For judge access set `CALBOK_PUBLIC_SIGNIN_ENABLED=true` and `CALBOK_USER_PROVIDER_ACCESS=true`. Email uses the existing one-time code (no password). Every account starts empty and its journal and recall namespace stay isolated. Set either flag false to close the corresponding capability.
 
 To change the owner email, update `CALBOK_OWNER_EMAIL` and restart the service. The new address signs into the existing operator workspace on its next successful email login, even if it previously had a member account. The former address loses access through email-based owner sessions. Existing receipts and their snapshots stay attached to their original workspace IDs. Operator-key sessions are managed separately under Account profile.
 
@@ -58,7 +58,7 @@ The ledger lists provider jobs, while the durable automatic queue includes recei
 
 **Lock again** copies a verified settled receipt into a review form. Confirmation creates a new linked receipt at server time and uses the normal settlement, memory and recall flow. It does not backdate the call or rewrite the original. Identical requests repeating the same original receipt are deduplicated. Repeating a historical prediction is a new prospective statement, not independent evidence that its author made another post.
 
-Settings checks the four email variable names without returning their values. **Send owner sign-in test** sends through the normal one-time-code delivery path and normal login rate limits. Provider acceptance proves Resend accepted the request; inbox delivery and completing the sign-in still need to be confirmed by the owner. Public sign-in and member provider access remain disabled.
+Settings checks the four email variable names without returning their values. **Send owner sign-in test** sends through the normal one-time-code delivery path and normal login rate limits. Provider acceptance proves Resend accepted the request; inbox delivery and completing the sign-in still need to be confirmed by the owner. Public sign-in is enabled on the judge deployment; member provider access is explicitly controlled by `CALBOK_USER_PROVIDER_ACCESS`.
 
 
 ### Owner repeat series
@@ -68,3 +68,9 @@ The owner can explicitly confirm 1–10 additional scheduled locks from a verifi
 `repeat_series` and `repeat_series_steps` persist owner confirmation, count, current receipt and recall state on the existing volume. A step association and progress update commit with the normal immutable receipt capture. The worker creates at most one new scheduled lock per invocation, only after the previous step's verified settlement and memory completion. Count completion, caution, an owner Stop, or a failed/uncertain provider operation prevents future locks. Already locked calls remain valid and can finish previously approved memory writes; failed scheduled submissions require manual review and are not automatically resubmitted. Uncertain recall after an interrupted process stops conservatively if no saved review can be recovered within three minutes.
 
 Receipts, exports and memory payloads disclose `scheduled repeat by owner, series <id>`. These are owner-scheduled predictions, not new posts from the referenced caller. Follow [the demo runbook](demo-runbook.md#owner-opt-in-repeat-series-scheduled-predictions-not-caller-posts) when presenting them.
+
+## Judge accounts and public proof
+
+`/proof` is public and read-only. It publishes only the operator’s verified stage counts and settled receipt IDs, asset/direction/horizon/outcome, return, provider, snapshot hash and qualifying Mainnet blob ID. It excludes caller text, source URLs, emails, account details, inbox data, private notes, raw memories, job errors and credentials. Visiting it never queries a provider or submits a write.
+
+Member limits are persisted in SQLite and shared by browser actions and worker submissions: **10 successful locks per UTC clock hour**, **10 new memory submission attempts per UTC day**, and **60 settlement/recall/status operations per UTC clock hour**. Attempts with uncertain acceptance retain their reservation; checking an existing memory job does not consume another write. Member limits do not change the operator’s existing approval budget. With member provider access on, worker settlement and backfill include member receipts; the owner automatic-write toggle continues to govern operator receipts only. The common one-new-memory-per-minute dispatch limit remains in place.

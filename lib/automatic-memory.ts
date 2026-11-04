@@ -1,3 +1,4 @@
+import {reserveUserBudget,userBudgetAvailable,UserLimitError} from './user-limits';
 import {seriesForReceipt,seriesMemoryAllowed,stopSeriesForReceipt} from './repeat-series-store';
 import {scheduledRepeat,scheduledRepeatLabel} from './scheduled-repeat';
 import {automaticRecall} from './receipt-recall';
@@ -27,7 +28,7 @@ function automaticSchema() {
 export function automaticMemoryStatus() {
   automaticSchema();
   const setting = db().prepare('SELECT enabled FROM automatic_memory_setting WHERE id=1').get();
-  const used = Number(db().prepare('SELECT COUNT(*) AS count FROM automatic_memory_attempts WHERE prediction_id NOT IN (SELECT prediction_id FROM repeat_series_steps)').get()?.count);
+  const used = Number(db().prepare("SELECT COUNT(*) AS count FROM automatic_memory_attempts a LEFT JOIN prediction_owners o USING(prediction_id) WHERE COALESCE(o.owner_id,'operator')='operator' AND a.prediction_id NOT IN (SELECT prediction_id FROM repeat_series_steps)").get()?.count);
   const limit=Number(db().prepare('SELECT write_limit FROM automatic_memory_budget WHERE id=1').get()?.write_limit??automaticLimit);
   const queued=eligibleMemoryReceipts().length;
   const seriesUsed=Number(db().prepare('SELECT COUNT(*) n FROM automatic_memory_attempts a JOIN repeat_series_steps t USING(prediction_id)').get()?.n);
@@ -41,6 +42,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
   if (!['won','lost','neutral'].includes(profileOutcome(receipt))) {
     return {status:409, message:'A verified settled receipt is required.'};
   }
+  if(ownerOf(receipt.id)!==owner || (owner!=='operator' && process.env.CALBOK_USER_PROVIDER_ACCESS!=='true'))return {status:403,message:'Provider access is not enabled for this account.'};
   automaticSchema();
   const database = db();
   const namespace = namespaceFor(owner === 'operator' ? receipt.caller : JSON.stringify([owner, receipt.caller]));
@@ -54,7 +56,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
     let idempotencyKey: string;
     database.exec('BEGIN IMMEDIATE');
     try {
-      if (automatic) {
+      if (automatic && owner==='operator') {
         const settings = automaticMemoryStatus();
         const series=seriesForReceipt(receipt.id);
         if (!settings.enabled || (series?!seriesMemoryAllowed(receipt.id):settings.used >= settings.limit)) {
@@ -69,6 +71,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
         database.exec('ROLLBACK');
         return {status:409, message:'A memory job already exists. Check its status.'};
       }
+      reserveUserBudget(owner,'memory-writes');
       if (automatic) {
         database.prepare('INSERT INTO automatic_memory_attempts VALUES (?,?)').run(receipt.id,new Date().toISOString());
       }
@@ -78,6 +81,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
       database.exec('COMMIT');
     } catch (error) {
       database.exec('ROLLBACK');
+      if(error instanceof UserLimitError)return {status:429,message:error.message};
       throw error;
     }
     activeSubmissions.add(receipt.id);
@@ -96,6 +100,7 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
     }
   }
   try {
+    reserveUserBudget(owner,'provider-reads');
     const result = automatic ? await client.getRememberStatus(jobId) : await client.waitForRememberJob(jobId,{timeoutMs:20_000});
     if (result.job_id && result.job_id !== jobId) throw new Error('Provider returned a different job ID');
     if ('status' in result && result.status !== 'done') {
@@ -117,7 +122,8 @@ export async function rememberReceipt(receipt: Receipt, owner: string, automatic
       await automaticRecall(owner,undefined,getClient).catch(()=>undefined);
     }
     return {status:200, message:'Durable memory completion confirmed.',blobId:result.blob_id};
-  } catch {
+  } catch (error) {
+    if(error instanceof UserLimitError)return {status:429,message:error.message};
     stopSeriesForReceipt(receipt.id,'MEMORY_CONFIRMATION_FAILURE');
     database.prepare("UPDATE memory_jobs SET error=? WHERE prediction_id=? AND job_id=? AND status<>'done'").run('Completion not confirmed; retry status check.',receipt.id,jobId);
     return {status:202, message:'Memory completion is pending or could not be confirmed.'};
@@ -269,13 +275,13 @@ export function resolveMemoryReview(id: string, decision: 'link'|'fail', blobId:
 /** Durable queue only: submissions still pass through rememberReceipt's verified evidence and budget checks. */
 export function queueSettledMemory(receipt: Receipt) {
   automaticSchema();
-  if (ownerOf(receipt.id)!=='operator' || !['won','lost','neutral'].includes(profileOutcome(receipt))) return;
+  if ((ownerOf(receipt.id)!=='operator' && process.env.CALBOK_USER_PROVIDER_ACCESS!=='true') || !['won','lost','neutral'].includes(profileOutcome(receipt))) return;
   const job=db().prepare('SELECT status FROM memory_jobs WHERE prediction_id=?').get(receipt.id);
   if(job && job.status!=='retryable') return;
   db().prepare("INSERT OR IGNORE INTO automatic_memory_queue(prediction_id,due_at) VALUES (?,'1970-01-01T00:00:00.000Z')").run(receipt.id);
 }
 export function backfillSettledMemories() {
-  for (const receipt of listReceipts('operator')) queueSettledMemory(receipt);
+  for (const receipt of listReceipts()) queueSettledMemory(receipt);
 }
 function eligibleMemoryReceipts() {
   return listReceipts('operator').filter(receipt=>{
@@ -293,7 +299,7 @@ export function rememberAllSettled(actor:{id:string;role:string}) {
   database.exec('BEGIN IMMEDIATE');
   try {
     backfillSettledMemories();
-    const used=Number(database.prepare('SELECT COUNT(*) n FROM automatic_memory_attempts WHERE prediction_id NOT IN (SELECT prediction_id FROM repeat_series_steps)').get()!.n);
+    const used=Number(database.prepare("SELECT COUNT(*) n FROM automatic_memory_attempts a LEFT JOIN prediction_owners o USING(prediction_id) WHERE COALESCE(o.owner_id,'operator')='operator' AND a.prediction_id NOT IN (SELECT prediction_id FROM repeat_series_steps)").get()!.n);
     const limit=Math.max(settings.limit,used+eligibleMemoryReceipts().length);
     database.prepare('INSERT INTO automatic_memory_budget VALUES (1,?) ON CONFLICT(id) DO UPDATE SET write_limit=MAX(write_limit,excluded.write_limit)').run(limit);
     setAutomaticMemory(true);
@@ -335,12 +341,15 @@ export async function automaticMemoryTick(getClient: ClientFactory = memoryClien
     if (receipt) await rememberReceipt(receipt,owner,true,getClient);
     return;
   }
-  if (!settings.enabled) return;
   const dispatch=database.prepare('SELECT due_at FROM automatic_memory_dispatch WHERE id=1').get();
   if(dispatch && String(dispatch.due_at)>now) return;
-  const receipt = listReceipts('operator').find(row=> {
+  const receipt = listReceipts().find(row=> {
+    const owner=ownerOf(row.id);
+    if(owner!=='operator' && process.env.CALBOK_USER_PROVIDER_ACCESS!=='true')return false;
+    if(!userBudgetAvailable(owner,'memory-writes',clock()))return false;
+    if(owner==='operator' && !settings.enabled)return false;
     const series=seriesForReceipt(row.id);
-    if(series?!seriesMemoryAllowed(row.id):settings.used>=settings.limit)return false;
+    if(owner==='operator' && (series?!seriesMemoryAllowed(row.id):settings.used>=settings.limit))return false;
     const queued=database.prepare('SELECT due_at FROM automatic_memory_queue WHERE prediction_id=?').get(row.id);
     if(!queued || String(queued.due_at)>now) return false;
     if (!['won','lost','neutral'].includes(profileOutcome(row))) return false;
@@ -350,6 +359,6 @@ export async function automaticMemoryTick(getClient: ClientFactory = memoryClien
   });
   if (receipt) {
     database.prepare('INSERT INTO automatic_memory_dispatch VALUES (1,?) ON CONFLICT(id) DO UPDATE SET due_at=excluded.due_at').run(new Date(clock()+60_000).toISOString());
-    await rememberReceipt(receipt,'operator',true,getClient);
+    await rememberReceipt(receipt,ownerOf(receipt.id),true,getClient);
   }
 }

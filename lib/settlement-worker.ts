@@ -1,3 +1,4 @@
+import {reserveUserBudget,UserLimitError} from './user-limits';
 import {repeatSeriesTick} from './repeat-series';
 import {stopSeriesForReceipt} from './repeat-series-store';
 import {exitCandleFinalizedAt} from './settlement-timing';
@@ -7,7 +8,7 @@ import {entryPriceTick} from './entry-price';
 import {automaticRecall} from './receipt-recall';
 import {automaticMemoryTick,queueSettledMemory,backfillSettledMemories} from './automatic-memory';
 import {randomUUID} from 'node:crypto';
-import {db,hash,listReceipts} from './db';
+import {db,hash,listReceipts,ownerOf} from './db';
 import {METHOD,settle,type Candle} from './domain';
 import {assetCandles,ProviderError} from './providers';
 import {parseGmgnAssetId} from './assets';
@@ -52,6 +53,7 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     return {message:paused?'Settlement needs manual review. Check provider coverage, then retry manually.':'Evidence unavailable. A retry has been scheduled.',error:code};
   }
   try {
+    reserveUserBudget(ownerOf(receipt.id),'provider-reads',clock());
     let pair=await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))]);
     if(fetchCandles===assetCandles && pair[0][0]?.provider!==pair[1][0]?.provider && !parseGmgnAssetId(receipt.asset)) {
       // Compare like quotes from one venue; never mix Coinbase USD and Binance USDT.
@@ -82,6 +84,11 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     if(settledReceipt) queueSettledMemory(settledReceipt);
     return {message:result.reason,result};
   } catch(error) {
+    if(error instanceof UserLimitError){
+      db().prepare("UPDATE settlement_jobs SET status='retry',attempts=MAX(0,attempts-1),next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error='ACCOUNT_PROVIDER_LIMIT',updated_at=? WHERE prediction_id=? AND lease_token=?")
+        .run(new Date((Math.floor(clock()/3600_000)+1)*3600_000).toISOString(),new Date(clock()).toISOString(),id,token);
+      return {message:error.message,error:'ACCOUNT_PROVIDER_LIMIT'};
+    }
     const code=error instanceof ProviderError && /^[A-Z][A-Z0-9_]{0,80}$/.test(error.code)?error.code:'SETTLEMENT_PROVIDER_UNAVAILABLE';
     return defer(code);
   }

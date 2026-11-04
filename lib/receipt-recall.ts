@@ -1,3 +1,4 @@
+import {reserveUserBudget} from './user-limits';
 import {stopSeriesForReceipt} from './repeat-series-store';
 import type {SqlRecallCitation,RecallReview} from './recall-types';
 import {db,listReceipts,type Receipt} from './db';
@@ -50,6 +51,7 @@ export function verifiedRecallReview(receipt:Receipt,owner:string,saved:unknown,
 }
 
 export async function recallReceipt(receipt: Receipt, owner: string, getClient:RecallClientFactory = memoryClient) {
+    reserveUserBudget(owner,'provider-reads');
     const namespace=namespaceFor(owner==='operator'?receipt.caller:JSON.stringify([owner,receipt.caller]));
     let recalled;
     try{const client=await getClient(namespace);recalled=await client.recall({query:`caller=${receipt.caller}; asset=${receipt.asset}; horizon=${receipt.horizon}; direction=${receipt.direction}`,namespace,limit:20,maxDistance:0.5});}

@@ -6,11 +6,31 @@
 
 A private prediction accountability app: lock prospective market calls, inspect immutable receipts, settle against eligible pricing, and recall prior outcomes as context for later calls.
 
+## For judges
+
+Live app: [calbok.xyz](https://calbok.xyz/). Sign-in is open and uses **email only with a one-time code**, no password. Every new account starts with an empty private journal; the owner's history is separate.
+
+1. Sign in, then choose **Lock your first 15m call** on Overview. Enter a real caller label and original prediction, select the exact market and direction, review the 15-minute horizon, and confirm. The server sets the lock time; pasted posts never backdate it.
+2. Watch the receipt and Due next panel. The worker observes the deadline within a minute and waits for the first eligible 1-minute exit candle to finalize. Missing prices remain unresolved. Inspect the provider and stored entry/exit evidence after settlement.
+3. With the worker, Walrus Mainnet and member provider access enabled, the verified outcome is queued for memory automatically. Inspect the memory ledger until the job is done with a blob ID; Remember outcome also uses the same safe path.
+4. Use Lock again on a remembered receipt to confirm a later same-group prediction. Recall runs on lock when matching prior memories completed before it; Check context also runs it explicitly. A first call has no prior memories to cite. Caution needs at least five completed matching wins/losses with a win rate below 40%, never a manufactured result.
+
+[Owner's public stage counts and settled receipts](https://calbok.xyz/proof) require no sign-in. Production check on 4 November 2026: **34 locks, 33 settled, 32 Mainnet memories, 1 cited recall, caution pending (0)**. These are dated observations; the public page recomputes current counts.
+
+Judge accounts are limited to 10 locks per UTC hour, 10 new memory submission attempts per UTC day, and 60 settlement/recall/status operations per UTC hour. Viewing public proof uses no provider quota.
+
+Examples of genuine stored settlements:
+
+- [Coinbase-priced win: CB-4b3e0ed9-2576-466d-9fb7-24758f174f1f](https://calbok.xyz/proof#CB-4b3e0ed9-2576-466d-9fb7-24758f174f1f)
+- [Coinbase-priced loss: CB-dd78b73e-76de-4782-871c-62ac8fa05bdc](https://calbok.xyz/proof#CB-dd78b73e-76de-4782-871c-62ac8fa05bdc)
+- [Binance-priced win: CB-571c74f4-f880-48ec-bd04-be2b8a64fbb7](https://calbok.xyz/proof#CB-571c74f4-f880-48ec-bd04-be2b8a64fbb7)
+- [GMGN-priced loss: CB-0d806fe9-05b8-47eb-adc5-b55d6950244f](https://calbok.xyz/proof#CB-0d806fe9-05b8-47eb-adc5-b55d6950244f)
+
+How it works: **lock → settle against Tatum/Coinbase/Binance/GMGN candles → Walrus Mainnet memory → SQL-cited recall → caution warning**. Each stage requires stored verifiable evidence. Horizons, callers, exact assets and directions stay separate. Journals stay private; only the explicitly allowlisted owner proof fields are public.
+
 ## Status
 
-This is a working **private owner deployment with gated account support** with live provider checks, not a final hackathon submission. The repository started empty on 24 October 2026. There are **zero verified Mainnet memory writes** and no fabricated prices, callers, or scores in the app.
-
-Primary workspace: [calbok.xyz](https://calbok.xyz/). Alias: [calbok.up.railway.app](https://calbok.up.railway.app/). Brand guide: [identity and assets](https://calbok.xyz/brand/index.html). Visitors see a sign-in screen. Journal APIs require a browser session or the existing operator bearer key. Public registration remains closed until email delivery is configured.
+This deployed app has email accounts, live settlements and confirmed Mainnet memory proof. A live caution demonstration, restart/recall demonstration and final submission artifacts remain unfinished. Primary origin: [calbok.xyz](https://calbok.xyz/); alias: [calbok.up.railway.app](https://calbok.up.railway.app/). [Brand guide](https://calbok.xyz/brand/index.html).
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
@@ -18,7 +38,7 @@ The overview includes a Due next deadline list, sorted oldest deadline first, wi
 
 Caller profiles include a searchable directory, performance filters by exact market, horizon and direction, and breakdowns with visible sample sizes. Win rates exclude pending, neutral and unreproducible results; stored candle evidence must reproduce the verdict. Receipt-history search, outcome filters and ordering do not change performance totals. Same-symbol tokens remain separate by chain and contract.
 
-Provider verification update (24 October 2026): Tatum Sui Mainnet gRPC coin metadata, one timestamp-validated historical BTC candle, Walrus authenticated recall, and GMGN search plus one VVV/Base historical candle now pass with locally configured credentials. See `docs/evidence/provider-verification.json` and `docs/evidence/gmgn-verification.json`. Completed Walrus writes and memory changing a real new-call warning remain release blockers. Other markets need their own coverage checks.
+Provider verification update (24 October 2026): Tatum Sui Mainnet gRPC coin metadata, one timestamp-validated historical BTC candle, Walrus authenticated recall, and GMGN search plus one VVV/Base historical candle now pass with locally configured credentials. See `docs/evidence/provider-verification.json` and `docs/evidence/gmgn-verification.json`. Confirmed writes are now visible on /proof; a real caution demonstration remains pending. Other markets need their own coverage checks.
 
 ## Run locally
 

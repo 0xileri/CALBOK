@@ -1,5 +1,6 @@
 import type {ScheduledRepeat} from './scheduled-repeat';
 import {lockAgainSeed} from './lock-again';
+import {reserveUserBudget} from './user-limits';
 import {horizonHours} from './horizons';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -93,6 +94,7 @@ export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inbo
       if(!completed)throw new Error('SERIES_MEMORY_NOT_READY');
     }
     if (inboxId && !database.prepare('SELECT 1 FROM call_inbox WHERE id=? AND owner_id=?').get(inboxId,ownerId)) throw new Error('INBOX_NOT_FOUND');
+    reserveUserBudget(ownerId,'locks',now.getTime());
     database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,claim.caller,claim.asset,claim.direction,claim.horizon,claim.text,claim.sourceUrl,now.toISOString(),deadline,fingerprint,hash(snapshot),'self_logged_before_outcome',snapshot);
     if(scheduled){
       database.prepare('INSERT INTO repeat_series_steps(series_id,step,prediction_id) VALUES (?,?,?)').run(scheduled.seriesId,scheduled.step,id);

@@ -1,3 +1,4 @@
+import {UserLimitError} from '@/lib/user-limits';
 import {entryPriceSchema} from '@/lib/entry-price';
 import {proofSchema} from '@/lib/integration-proof-store';
 import {automaticRecall,verifiedRecallReview,memoryHistory} from '@/lib/receipt-recall';
@@ -36,6 +37,7 @@ export async function POST(request:Request) {
     const review = await automaticRecall(owner,id).catch(() => undefined);
     return Response.json({id,review},{status:201});
   } catch(error) {
+    if(error instanceof UserLimitError)return Response.json({error:error.message},{status:429});
     const duplicate=error instanceof Error && error.message.includes('UNIQUE');
     return Response.json({error:duplicate?'This call is already locked.':'Could not lock this call. Check the input and try again.'},{status:duplicate?409:400});
   }
