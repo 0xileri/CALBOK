@@ -16,3 +16,11 @@ test('exclusive close is accepted; other durations and wrapped payloads are refu
   for(const closeTime of [179_998,180_001,120_001])assert.throws(()=>normalizeTatumCandle({...candle,closeTime}),/PRICE_INTERVAL_UNVERIFIED/);
   assert.throws(()=>normalizeTatumCandle({data:candle}),/PRICE_SCHEMA_UNVERIFIED/);
 });
+
+test('Tatum closest records cannot substitute a missing locked boundary',async()=>{
+  const {validateTatumBoundary}=await import('../lib/providers');
+  const valid=normalizeTatumCandle(candle);
+  assert.equal(validateTatumBoundary(valid,120_000),valid);
+  assert.throws(()=>validateTatumBoundary(valid,180_000),/TATUM_PRICE_BOUNDARY_UNAVAILABLE/);
+  assert.throws(()=>validateTatumBoundary(valid,59_999),/TATUM_PRICE_BOUNDARY_UNAVAILABLE/);
+});

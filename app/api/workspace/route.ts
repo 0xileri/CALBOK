@@ -1,3 +1,4 @@
+import {entryPriceSchema} from '@/lib/entry-price';
 import {proofSchema} from '@/lib/integration-proof-store';
 import {automaticRecall} from '@/lib/receipt-recall';
 import {z} from 'zod';
@@ -13,11 +14,13 @@ export async function GET(request:Request) {
   const denied=authorize(request);if(denied)return denied;
   const user=principal(request)!,receipts=listReceipts(user.id),ids=new Set(receipts.map(row=>row.id));
   proofSchema();
+  entryPriceSchema();
+  const entryPrices=db().prepare("SELECT e.* FROM entry_prices e JOIN prediction_owners o ON o.prediction_id=e.prediction_id WHERE o.owner_id=?").all(user.id);
   const recallReviews = Object.fromEntries(db().prepare('SELECT prediction_id,review FROM recall_proofs WHERE owner_id=? ORDER BY created_at,rowid').all(user.id).flatMap(row => {
     try { return [[String(row.prediction_id),JSON.parse(String(row.review))]]; } catch { return []; }
   }));
   const status=settlementStatus();status.jobs=status.jobs.filter(job=>ids.has(job.prediction_id));
-  return Response.json({receipts,recallReviews,settlement:status,memoryJobs:db().prepare("SELECT m.* FROM memory_jobs m JOIN predictions p ON p.id=m.prediction_id LEFT JOIN prediction_owners o ON o.prediction_id=p.id WHERE COALESCE(o.owner_id,'operator')=?").all(user.id),onchain:user.role==='operator'?db().prepare('SELECT * FROM onchain_evidence').all():[],providers:configuration()},{headers:{'Cache-Control':'no-store'}});
+  return Response.json({receipts,entryPrices,recallReviews,settlement:status,memoryJobs:db().prepare("SELECT m.* FROM memory_jobs m JOIN predictions p ON p.id=m.prediction_id LEFT JOIN prediction_owners o ON o.prediction_id=p.id WHERE COALESCE(o.owner_id,'operator')=?").all(user.id),onchain:user.role==='operator'?db().prepare('SELECT * FROM onchain_evidence').all():[],providers:configuration()},{headers:{'Cache-Control':'no-store'}});
 }
 export async function POST(request:Request) {
   const denied=authorize(request);if(denied)return denied;

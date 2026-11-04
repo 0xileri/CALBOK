@@ -1,3 +1,4 @@
+import {entryPriceTick} from './entry-price';
 import {automaticRecall} from './receipt-recall';
 import {automaticMemoryTick} from './automatic-memory';
 import {randomUUID} from 'node:crypto';
@@ -86,6 +87,7 @@ export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Opti
       await runSettlement(job.prediction_id,{clock,fetchCandles});
     }
     if(process.env.CALBOK_WORKER_ENABLED==='true') {
+      await entryPriceTick(clock,fetchCandles);
       await automaticMemoryTick();
       await automaticRecall('operator');
     }

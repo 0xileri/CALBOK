@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+process.env.CALBOK_DB_PATH=join(mkdtempSync(join(tmpdir(),'calbok-entry-')),'test.sqlite');
+const {capture,db}=await import('../lib/db');
+const {recordEntryPrice}=await import('../lib/entry-price');
+test('entry price waits for finalization, rejects stale evidence and preserves the first valid price',async()=>{
+ const id=capture({caller:'SYNTHETIC TEST',text:'Synthetic entry evidence test only',asset:'BTC',direction:'bullish',horizon:'24h',sourceUrl:''});
+ const row=db().prepare('SELECT locked_at FROM predictions WHERE id=?').get(id)!;
+ const boundary=Date.parse(String(row.locked_at)),openTime=Math.ceil(boundary/60000)*60000;
+ let reads=0;
+ const candle={openTime,closeTime:openTime+60000,open:'100',high:'110',low:'90',close:'101',hash:'test'};
+ const provider=async()=>{reads++;return [candle];};
+ assert.equal(await recordEntryPrice(id,provider,()=>boundary),undefined);
+ assert.equal(reads,0);
+ const stale=await recordEntryPrice(id,async()=>[{...candle,openTime:0,closeTime:60000}],()=>openTime+60000);
+ assert.equal(stale?.candle,null);
+ assert.equal(stale?.error,'ENTRY_PRICE_BOUNDARY_UNAVAILABLE');
+ const valid=await recordEntryPrice(id,provider,()=>openTime+60000);
+ assert.equal(JSON.parse(valid!.candle!).open,'100');
+ await recordEntryPrice(id,async()=>{throw Error('Must not refetch');},()=>openTime+120000);
+ assert.equal(db().prepare('SELECT candle FROM entry_prices WHERE prediction_id=?').get(id)?.candle,valid?.candle);
+ db().close();
+});

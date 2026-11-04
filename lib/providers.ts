@@ -39,6 +39,13 @@ export function normalizeTatumCandle(raw:unknown):Candle {
   if(duration!==59_999 && duration!==60_000)throw new ProviderError('PRICE_INTERVAL_UNVERIFIED');
   return {...candle,sourceCloseTime:candle.closeTime,closeTime:candle.openTime+60_000,hash:hash(JSON.stringify(raw))};
 }
+export function validateTatumBoundary(candle:Candle,boundary:number):Candle {
+  if (candle.openTime<boundary || candle.openTime-boundary>60_000) {
+    throw new ProviderError('TATUM_PRICE_BOUNDARY_UNAVAILABLE');
+  }
+  return candle;
+}
+
 export async function priceCandle(asset:string, boundary:number):Promise<Candle> {
   // Align up: an overlapping pre-lock candle is not admissible.
   const requested = Math.ceil(boundary/60_000)*60_000;
@@ -47,7 +54,7 @@ export async function priceCandle(asset:string, boundary:number):Promise<Candle>
   const raw = await tatum(url.toString());
   // Tatum's live 1m response uses an inclusive final millisecond (duration 59,999).
   // Normalize only this exact convention and retain the raw boundary for audits.
-  return normalizeTatumCandle(raw);
+  return validateTatumBoundary(normalizeTatumCandle(raw),boundary);
 }
 export async function assetCandles(asset:string,boundary:number):Promise<Candle[]> {
   const token=parseGmgnAssetId(asset);
