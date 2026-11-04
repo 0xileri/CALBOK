@@ -19,11 +19,11 @@ const {lockAgainSeed}=await import('../lib/lock-again');
 const {integrationProof}=await import('../lib/integration-proof');
 const {profileOutcome}=await import('../lib/caller-profiles');
 const token={id:'gmgn:sol:So11111111111111111111111111111111111111112',symbol:'TEST',name:'Synthetic test token',provider:'GMGN' as const,chain:'sol',address:'So11111111111111111111111111111111111111112'};
-test('1h/4h lock, settle, remember and cited repeat work for Tatum, Coinbase, Binance and GMGN without backdating',async(t)=>{
+test('15m/1h/4h lock, settle, remember and cited repeat work for Tatum, Coinbase, Binance and GMGN without backdating',async(t)=>{
  try{
   registerAsset(token);const now=Math.floor(Date.now()/60000)*60000;
-  for(const source of ['Tatum','Coinbase','Binance','GMGN'])for(const hours of [1,4] as const){
-   const horizon=hours===1?'1h':'4h',caller='TEST '+source+' '+horizon,asset=source==='GMGN'?token.id:'BTC';
+  for(const source of ['Tatum','Coinbase','Binance','GMGN'])for(const hours of [0.25,1,4] as const){
+   const horizon=hours===0.25?'15m':hours===1?'1h':'4h',caller='TEST '+source+' '+horizon,asset=source==='GMGN'?token.id:'BTC';
    const locked=now-hours*3600000-120000;
    t.mock.timers.enable({apis:['Date'],now:locked});
    const id=capture({caller,text:'SYNTHETIC SHORT HORIZON TEST '+source+horizon,asset,direction:'bullish',horizon,sourceUrl:''});t.mock.timers.reset();
@@ -54,6 +54,6 @@ test('1h/4h lock, settle, remember and cited repeat work for Tatum, Coinbase, Bi
   }
   const receipts=listReceipts('operator');const completed=db().prepare('SELECT * FROM memory_completion_proofs').all();const jobs=db().prepare('SELECT * FROM memory_jobs').all();
   const proof=integrationProof(receipts,jobs as unknown as MemoryJob[],completed as unknown as CompletionProof[],[],[]);
-  assert.equal(proof.groups.length,8);assert.ok(proof.groups.every(g=>g.count===1&&g.winRate==='100.0'&&g.closest));
+  assert.equal(proof.groups.length,12);assert.ok(proof.groups.every(g=>g.count===1&&g.winRate==='100.0'&&g.closest));
  }finally{t.mock.timers.reset();db().close();}
 });

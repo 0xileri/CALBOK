@@ -68,7 +68,7 @@ npm.cmd run build
 ## Design boundaries
 
 - Private owner journal with per-account receipt ownership and scoped APIs. Email verification authenticates an account, not the caller labels on receipts. Public signup and member provider operations are disabled by default. No public reputation rankings.
-- Prospective directional calls support 1h, 4h, 24h and 7d; target calls, retrospective imports, disputes, X API verification, and automatic extraction are not implemented.
+- Prospective directional calls support 15m, 1h, 4h, 24h and 7d; target calls, retrospective imports, disputes, X API verification, and automatic extraction are not implemented.
 - The searchable catalog includes all 439 symbols from Tatum's official OHLCV schema, plus live GMGN token search. Provider listing or discovery is **not a promise of validated historical coverage**. Use the selected asset's **Verify historical pricing sample** button; entry/exit timestamps are independently checked again at settlement. Production acceptance should enforce coverage requirements for the relevant window.
 - Structured fields are the scoring contract; prose is preserved as untrusted data and is never executed or interpreted by an LLM. The author must resolve contradictory prose before submitting.
 - The Tatum price parser requires explicit millisecond `openTime`/`closeTime` and OHLC fields. Live verification confirmed a 59,999ms inclusive close for 1-minute data. The adapter normalizes only exact 59,999ms/60,000ms intervals to an exclusive close and preserves `sourceCloseTime` and the raw-response hash. Other durations are rejected.

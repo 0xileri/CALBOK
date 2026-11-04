@@ -9,7 +9,7 @@ const {claimSchema}=await import('../lib/domain');
 const {automaticMemoryStatus,automaticMemoryTick,setAutomaticMemory}=await import('../lib/automatic-memory');
 
 test('supported horizons persist their exact deadline and queue boundary',()=>{
-  for (const [horizon,hours] of [['1h',1],['4h',4],['24h',24],['7d',168]] as const) {
+  for (const [horizon,hours] of [['15m',0.25],['1h',1],['4h',4],['24h',24],['7d',168]] as const) {
     const claim=claimSchema.parse({caller:'TEST',text:'SYNTHETIC HORIZON TEST ONLY',asset:'BTC',direction:'bullish',horizon});
     const id=capture(claim);
     const receipt=listReceipts('operator').find(row=>row.id===id)!;

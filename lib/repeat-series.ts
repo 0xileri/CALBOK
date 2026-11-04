@@ -15,7 +15,7 @@ export function startRepeatSeries(actor:Actor,seedId:string,count:number,request
  const prior=db().prepare('SELECT * FROM repeat_series WHERE owner_id=? AND request_id=?').get(actor.id,requestId) as RepeatSeries|undefined;
  if(prior)return prior.seed_id===seedId&&prior.target_count===count?{status:200,seriesId:prior.id,message:'Series already confirmed.'}:{status:409,message:'Confirmation was already used for different terms.'};
  const history=memoryHistory(actor.id),seed=history.receipts.find(row=>row.id===seedId);
- if(!seed||!['1h','4h'].includes(seed.horizon)||!lockAgainSeed(seed)||!history.completed.some(p=>p.prediction_id===seedId))return {status:409,message:'A verified settled 1h or 4h receipt with confirmed Mainnet memory is required.'};
+ if(!seed||!['15m','1h','4h'].includes(seed.horizon)||!lockAgainSeed(seed)||!history.completed.some(p=>p.prediction_id===seedId))return {status:409,message:'A verified settled 15m, 1h or 4h receipt with confirmed Mainnet memory is required.'};
  const settings=automaticMemoryStatus();
  if(!settings.available||!settings.enabled)return {status:409,message:'Enable the worker and automatic Mainnet memory before starting a series.'};
  const group=JSON.stringify([seed.caller.trim().toLowerCase(),seed.asset,seed.direction,seed.horizon]),id='RS-'+randomUUID(),now=new Date().toISOString();

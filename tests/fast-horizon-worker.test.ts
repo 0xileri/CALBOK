@@ -12,10 +12,10 @@ const {normalizeBinanceCandle}=await import('../lib/binance-pricing');
 const {normalizeGmgnCandles}=await import('../lib/gmgn');
 const {exitCandleFinalizedAt}=await import('../lib/settlement-timing');
 const token={id:'gmgn:sol:So11111111111111111111111111111111111111112',symbol:'TEST',name:'SYNTHETIC TEST',provider:'GMGN' as const,chain:'sol',address:'So11111111111111111111111111111111111111112'};
-test('1h/4h deadlines are observed within one sweep for all sources, without reads or settlement before exit finality',async(t)=>{
+test('15m/1h/4h deadlines are observed within one sweep for all sources, without reads or settlement before exit finality',async(t)=>{
  try{
   registerAsset(token);let sequence=0;
-  for(const provider of ['Tatum','Coinbase','Binance','GMGN'])for(const horizon of ['1h','4h'] as const){
+  for(const provider of ['Tatum','Coinbase','Binance','GMGN'])for(const horizon of ['15m','1h','4h'] as const){
    const locked=Date.UTC(2026,9,1)+(sequence++)*10*3600000+45321;
    t.mock.timers.enable({apis:['Date'],now:locked});
    const id=capture({caller:'TEST '+provider+horizon,asset:provider==='GMGN'?token.id:'BTC',direction:'bullish',horizon,text:'SYNTHETIC TIMING TEST '+provider+horizon,sourceUrl:''});t.mock.timers.reset();
