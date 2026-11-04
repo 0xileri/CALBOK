@@ -4,7 +4,7 @@ import Link from 'next/link';
 export function PublicProofView({proof}:{proof:PublicProof}) {
   return <main style={{maxWidth:1100,margin:'auto',padding:'48px 24px'}}>
     <Link href="/">CALBOK · Open your journal</Link><h1>Public integration proof</h1>
-    <p>The owner&apos;s stored, reproducible evidence. Your own account starts empty. This page performs no provider requests or memory writes.</p>
+    <p>The owner&apos;s published, visible, reproducible evidence. Private and hidden calls are excluded. Your own account starts empty. This page performs no provider requests or memory writes.</p>
     <p>Checked {proof.checkedAt}. Missing proof is not proof of failure.</p>
     <section aria-label="Integration proof stages">{proof.stages.map(stage=><p key={stage.key}><strong>{stage.count}</strong> · {stage.label}</p>)}</section>
     <p>Memory completion records describe the configured Walrus Mainnet path, rather than independent chain attestations. Returns are directional market changes, not trading returns.</p>

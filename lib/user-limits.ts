@@ -2,7 +2,7 @@ import {db} from './db';
 
 type Budget = 'locks'|'memory-writes'|'provider-reads';
 const limits:Record<Budget,{count:number;window:number}> = {
-  locks:{count:10,window:3600_000},
+  locks:{count:20,window:3600_000},
   'memory-writes':{count:10,window:86400_000},
   'provider-reads':{count:60,window:3600_000},
 };

@@ -36,6 +36,8 @@ const {PublicProofView}=await import('../components/public-proof');
 const {POST:signIn}=await import('../app/api/auth/route');
 const {saveReceiptNote}=await import('../lib/receipt-notes');
 const {logInbox}=await import('../lib/call-inbox');
+const {saveAccountProfile}=await import('../lib/account-profile');
+const {publishReceipt}=await import('../lib/publication');
 const claim={caller:'SYNTHETIC TEST',text:'SYNTHETIC JUDGE TEST ONLY',asset:'BTC',direction:'bullish' as const,horizon:'15m' as const,sourceUrl:''};
 const receipt=(id:string)=>listReceipts().find(row=>row.id===id)!;
 const req=(token:string,payload?:unknown)=>new Request('https://calbok.example/api/workspace',{method:payload?'POST':'GET',headers:{origin:'https://calbok.example',cookie:'calbok_session='+token,'Content-Type':'application/json'},...(payload?{body:JSON.stringify(payload)}:{})});
@@ -52,10 +54,11 @@ test('judge email session starts empty; member lock, settlement, memory, recall 
   assert.equal(emailResponse.status,200);assert.match(emailResponse.headers.get('set-cookie')||'',/calbok_session=.*HttpOnly/);
   const ids:string[]=[];
   for(let i=0;i<10;i++){const response=await lock(req(token,{...claim,text:claim.text+i}));assert.equal(response.status,201);ids.push((await response.json()).id);}
+  for(let i=0;i<10;i++)reserveUserBudget(user.id,'locks');
   assert.equal((await lock(req(token,{...claim,text:'SYNTHETIC ELEVENTH LOCK'}))).status,429);
   assert.equal(listReceipts(user.id).length,10);
   const reopened=new DatabaseSync(process.env.CALBOK_DB_PATH!);
-  assert.equal(reopened.prepare("SELECT count FROM user_usage WHERE owner_id=? AND budget='locks'").get(user.id)?.count,10);reopened.close();
+  assert.equal(reopened.prepare("SELECT count FROM user_usage WHERE owner_id=? AND budget='locks'").get(user.id)?.count,20);reopened.close();
   const other={id:'another-judge',role:'user' as const,email:'another@example.test'};
   assert.equal((await lock(req(createSession(other),claim))).status,201,'Limits belong to each user');
   process.env.CALBOK_USER_PROVIDER_ACCESS='false';assert.equal((await action(req(token,{action:'settle',id:ids[0]}))).status,403);
@@ -101,6 +104,9 @@ test('judge email session starts empty; member lock, settlement, memory, recall 
 test('public proof page needs no session and exposes only verified owner evidence, never private records',async()=>{
  const privateValues=['PRIVATE_EMAIL@example.test','PRIVATE_NOTE_SENTINEL','RAW_MEMORY_SENTINEL','TOKEN_SENTINEL','INBOX_SENTINEL'];
  const id=capture({...claim,text:privateValues.join(' '),sourceUrl:'https://example.test/TOKEN_SENTINEL'});
+ saveAccountProfile({id:'operator',role:'operator',email:null},{displayName:'',publicHandle:'proof_owner'});
+ publishReceipt(id,{id:'operator',role:'operator',email:null});
+ const stillPrivate=capture({...claim,text:'PRIVATE OWNER RECEIPT MUST NOT LEAK THROUGH PROOF'});
  saveReceiptNote(id,'operator','PRIVATE_NOTE_SENTINEL',0);
  logInbox('operator',{requestId:randomUUID(),caller:'PRIVATE_EMAIL@example.test',text:'INBOX_SENTINEL',sourceUrl:''});
  const row=receipt(id),now=Date.parse(row.deadline)+120000;
@@ -108,6 +114,7 @@ test('public proof page needs no session and exposes only verified owner evidenc
  db().prepare('INSERT INTO memory_jobs(prediction_id,namespace,status,job_id,blob_id,completed_at,error) VALUES (?,?,?,?,?,?,?)').run(id,'PRIVATE_NAMESPACE','done','PRIVATE_JOB','PUBLIC_BLOB',new Date(now).toISOString(),'PRIVATE_NOTE_SENTINEL');
  db().prepare('INSERT INTO memory_completion_proofs VALUES (?,?,?,?,?)').run(id,'PRIVATE_JOB','PUBLIC_BLOB','mainnet',new Date(now).toISOString());
  const proof=ownerPublicProof();assert.deepEqual(proof.receipts.map(r=>r.id),[id]);assert.equal(proof.receipts[0].blobId,'PUBLIC_BLOB');assert.equal(proof.receipts[0].provider,'Coinbase');
+ assert.equal(proof.stages.find(stage=>stage.key==='lock')?.count,1);assert.ok(!JSON.stringify(proof).includes(stillPrivate));
  const html=renderToStaticMarkup(ProofPage()),serialized=JSON.stringify(proof);
  assert.match(html,/Public integration proof/);assert.match(html,/PUBLIC_BLOB/);
  for(const secret of [...privateValues,'PRIVATE_NAMESPACE','PRIVATE_JOB',process.env.CALBOK_ADMIN_TOKEN!]){assert.ok(!html.includes(secret));assert.ok(!serialized.includes(secret));}

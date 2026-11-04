@@ -1,3 +1,4 @@
+import {signInIpLimited} from '@/lib/signin-limit';
 import {z} from 'zod';
 import {accountDetails} from '@/lib/account-profile';
 import {body,originGuard} from '@/lib/http';
@@ -15,6 +16,7 @@ export async function POST(request:Request){
       z.object({action:z.literal('logout')}),
       z.object({action:z.literal('test-email')})
     ]).parse(await body(request));
+    if(['request','verify','operator'].includes(input.action)&&signInIpLimited(request))return response({error:'Too many sign-in attempts from this network. Try again in 15 minutes.'},429,{'Retry-After':'900'});
     if(input.action==='test-email'){if(principal(request)?.role!=='operator')return response({error:'Owner access required.'},403);await testOwnerEmail();return response({message:'Resend accepted a sign-in email for the configured owner. Check the owner inbox to confirm delivery.'});}
     if(input.action==='logout'){revokeSession(request);return response({message:'Signed out.'},200,{'Set-Cookie':cookie('',request,true)});}
     if(input.action==='operator'){

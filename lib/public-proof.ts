@@ -18,7 +18,7 @@ export function publicProof(proof:IntegrationProof) {
 }
 export function ownerPublicProof() {
   proofSchema();
-  const receipts=listReceipts('operator'),ids=new Set(receipts.map(row=>row.id));
+  const receipts=listReceipts('operator').filter(row=>row.visibility==='public'&&!row.public_hidden),ids=new Set(receipts.map(row=>row.id));
   const jobs=(db().prepare('SELECT * FROM memory_jobs').all() as MemoryJob[]).filter(row=>ids.has(row.prediction_id));
   const completed=(db().prepare('SELECT * FROM memory_completion_proofs').all() as CompletionProof[]).filter(row=>ids.has(row.prediction_id));
   const recalls=db().prepare('SELECT prediction_id,review,created_at FROM recall_proofs WHERE owner_id=?').all('operator') as RecallProof[];

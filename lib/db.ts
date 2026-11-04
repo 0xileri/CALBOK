@@ -1,3 +1,4 @@
+import {publicationSchema,initializePublication,type Visibility} from './publication';
 import type {ScheduledRepeat} from './scheduled-repeat';
 import {lockAgainSeed} from './lock-again';
 import {reserveUserBudget} from './user-limits';
@@ -61,13 +62,14 @@ export function db() {
       recall_state TEXT NOT NULL DEFAULT 'pending',recall_started_at TEXT,PRIMARY KEY(series_id,step));`);
   return instance;
 }
-export type Receipt = {inbox_id?:string|null;snapshot?:string;id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
+export type Receipt = {visibility?:Visibility;public_hidden?:number;inbox_id?:string|null;snapshot?:string;id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
 export const hash = (value:string) => createHash('sha256').update(value).digest('hex');
-export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("SELECT p.*, l.inbox_id, a.symbol AS asset_symbol, a.provider AS asset_provider, s.outcome, s.evidence, s.method FROM predictions p LEFT JOIN receipt_inbox_links l ON l.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id LEFT JOIN assets a ON a.id=p.asset LEFT JOIN prediction_owners o ON o.prediction_id=p.id"+(ownerId?" WHERE COALESCE(o.owner_id,'operator')=?":"")+' ORDER BY p.locked_at DESC').all(...(ownerId?[ownerId]:[])) as unknown as Receipt[]; }
+export function listReceipts(ownerId?:string):Receipt[] { publicationSchema();return db().prepare("SELECT p.*, COALESCE(v.visibility,'private') AS visibility,COALESCE(v.hidden,0) AS public_hidden, l.inbox_id, a.symbol AS asset_symbol, a.provider AS asset_provider, s.outcome, s.evidence, s.method FROM predictions p LEFT JOIN receipt_publication v ON v.prediction_id=p.id LEFT JOIN receipt_inbox_links l ON l.prediction_id=p.id LEFT JOIN settlements s ON s.prediction_id=p.id LEFT JOIN assets a ON a.id=p.asset LEFT JOIN prediction_owners o ON o.prediction_id=p.id"+(ownerId?" WHERE COALESCE(o.owner_id,'operator')=?":"")+' ORDER BY p.locked_at DESC').all(...(ownerId?[ownerId]:[])) as unknown as Receipt[]; }
 export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}
 export function registerAsset(asset:Asset){db().prepare('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?)').run(asset.id,asset.symbol,asset.name,asset.provider,asset.chain||null,asset.address||null,asset.discoveredAt||new Date().toISOString());}
 export function knownAsset(id:string):Asset|null{const row=db().prepare('SELECT * FROM assets WHERE id=?').get(id) as Record<string,string>|undefined;return row?{id:row.id,symbol:row.symbol,name:row.name,provider:row.provider as Asset['provider'],chain:row.chain,address:row.address}:null;}
-export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string,sameGroup=false,scheduled?:ScheduledRepeat) {
+export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string,sameGroup=false,scheduled?:ScheduledRepeat,visibility:Visibility='private') {
+  publicationSchema();
   if(sameGroup&&!repeatOf)throw new Error('PRIOR_RECEIPT_REQUIRED');
   if(repeatOf){
     const prior=listReceipts(ownerId).find(row=>row.id===repeatOf);
@@ -96,6 +98,7 @@ export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inbo
     if (inboxId && !database.prepare('SELECT 1 FROM call_inbox WHERE id=? AND owner_id=?').get(inboxId,ownerId)) throw new Error('INBOX_NOT_FOUND');
     reserveUserBudget(ownerId,'locks',now.getTime());
     database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,claim.caller,claim.asset,claim.direction,claim.horizon,claim.text,claim.sourceUrl,now.toISOString(),deadline,fingerprint,hash(snapshot),'self_logged_before_outcome',snapshot);
+    initializePublication(id,ownerId,visibility);
     if(scheduled){
       database.prepare('INSERT INTO repeat_series_steps(series_id,step,prediction_id) VALUES (?,?,?)').run(scheduled.seriesId,scheduled.step,id);
       database.prepare('UPDATE repeat_series SET current_id=?,created_count=?,updated_at=? WHERE id=?').run(id,scheduled.step,now.toISOString(),scheduled.seriesId);

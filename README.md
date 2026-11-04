@@ -8,16 +8,16 @@ A private prediction accountability app: lock prospective market calls, inspect 
 
 ## For judges
 
-Live app: [calbok.xyz](https://calbok.xyz/). Sign-in is open and uses **email only with a one-time code**, no password. Every new account starts with an empty private journal; the owner's history is separate.
+Live app: [calbok.xyz](https://calbok.xyz/). Sign-in is open and uses **email only with a one-time code**, no password. Every new account starts with an empty private journal; the owner's history is separate. [See live calls](https://calbok.xyz/feed) without signing in.
 
 1. Sign in, then choose **Lock your first 15m call** on Overview. Enter a real caller label and original prediction, select the exact market and direction, review the 15-minute horizon, and confirm. The server sets the lock time; pasted posts never backdate it.
 2. Watch the receipt and Due next panel. The worker observes the deadline within a minute and waits for the first eligible 1-minute exit candle to finalize. Missing prices remain unresolved. Inspect the provider and stored entry/exit evidence after settlement.
 3. With the worker, Walrus Mainnet and member provider access enabled, the verified outcome is queued for memory automatically. Inspect the memory ledger until the job is done with a blob ID; Remember outcome also uses the same safe path.
 4. Use Lock again on a remembered receipt to confirm a later same-group prediction. Recall runs on lock when matching prior memories completed before it; Check context also runs it explicitly. A first call has no prior memories to cite. Caution needs at least five completed matching wins/losses with a win rate below 40%, never a manufactured result.
 
-[Owner's public stage counts and settled receipts](https://calbok.xyz/proof) require no sign-in. Production check on 4 November 2026: **34 locks, 33 settled, 32 Mainnet memories, 1 cited recall, caution pending (0)**. These are dated observations; the public page recomputes current counts.
+[Owner's published proof stage counts and settled receipts](https://calbok.xyz/proof) require no sign-in. Production check on 4 November 2026: **34 locks, 33 settled, 32 Mainnet memories, 1 cited recall, caution pending (0)**. These are dated observations of the private owner workspace. The public proof page now counts only explicitly published, visible owner receipts, so its counts can be lower. Existing receipts are not published automatically.
 
-Judge accounts are limited to 10 locks per UTC hour, 10 new memory submission attempts per UTC day, and 60 settlement/recall/status operations per UTC hour. Viewing public proof uses no provider quota.
+Judge accounts are limited to 20 locks per UTC hour, 10 new memory submission attempts per UTC day, and 60 settlement/recall/status operations per UTC hour. Viewing public proof uses no provider quota.
 
 Examples of genuine stored settlements:
 
@@ -26,7 +26,7 @@ Examples of genuine stored settlements:
 - [Binance-priced win: CB-571c74f4-f880-48ec-bd04-be2b8a64fbb7](https://calbok.xyz/proof#CB-571c74f4-f880-48ec-bd04-be2b8a64fbb7)
 - [GMGN-priced loss: CB-0d806fe9-05b8-47eb-adc5-b55d6950244f](https://calbok.xyz/proof#CB-0d806fe9-05b8-47eb-adc5-b55d6950244f)
 
-How it works: **lock → settle against Tatum/Coinbase/Binance/GMGN candles → Walrus Mainnet memory → SQL-cited recall → caution warning**. Each stage requires stored verifiable evidence. Horizons, callers, exact assets and directions stay separate. Journals stay private; only the explicitly allowlisted owner proof fields are public.
+How it works: **lock → settle against Tatum/Coinbase/Binance/GMGN candles → Walrus Mainnet memory → SQL-cited recall → caution warning**. Each stage requires stored verifiable evidence. Horizons, callers, exact assets and directions stay separate. Calls default to private. Set a unique public username in Account profile, then choose Public when locking or confirm Publish call later. Publishing is one-way; the public feed shows only allowlisted receipt fields, with the logger username separate from the named prediction caller.
 
 ## Status
 
@@ -165,3 +165,11 @@ Quick call capture checks the signed-in owner's full inbox for equal whitespace/
 Caller profiles now include caller labels from captured calls, with full-history captured/reviewed totals and paginated owner-scoped captured history. ASCII case differences group the same label across captures and scored receipts; this is not identity verification. Private reviews load only when a captured call is opened. Personal reviewed status is separate from verified win/loss outcomes and excluded from performance metrics. Performance filters apply only to scored receipts, not the captured history.
 
 Integration proof tracks the real lock → verified settlement → completed Mainnet memory → SQL-linked recall → caution loop. Viewing /api/integration-proof only reads local stored evidence; it does not run providers. Remember confirmation atomically records job/blob/network evidence, and Recall stores its computed warning and receipt citations without raw memory contents. Pending jobs, missing network records, invalid outcomes and cross-owner records do not advance proof. Publication and restart demonstrations remain explicit manual checks.
+
+## Public feed and caller records
+
+[Live calls](https://calbok.xyz/feed) is open without sign-in, with caller, exact asset, horizon and outcome filters and paginated newest-first receipts. `/caller/<handle>` describes the named prediction caller, not the user who logged the call. Its record uses public, visible, reproducibly settled calls only; neutral results never inflate win rate. Every card is labeled self-logged before outcome. Neither a caller label nor a logger username verifies authorship. Owner-scheduled repeats keep their disclosure.
+
+Profile usernames use 3–30 letters, numbers or underscores, are unique without case differences, and are required for publishing. Original call text, source URLs, emails, display names, private notes, inbox data, job IDs, account IDs and raw memory text stay out of public responses. Snapshot hashes and qualifying blob IDs are public proof identifiers. `/proof` now respects the same visibility and abuse hiding for owner receipts. Existing calls remain private until explicitly published.
+
+Owners can hide a published call for abuse through the feed moderation control or the receipt. Hiding retains its immutable terms, settlement and memory, with an atomic audit event; republishing cannot bypass the hidden state. Member lock quota is 20 per UTC hour; the existing 10 memory submission attempts per UTC day and operator approval budgets remain in place. Sign-in attempts share a durable per-IP limit of 30 per 15-minute window across code requests, verification and owner-key login.
