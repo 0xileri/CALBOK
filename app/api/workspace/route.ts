@@ -27,11 +27,11 @@ export async function POST(request:Request) {
   if(rateLimit())return Response.json({error:'Please wait a minute before trying again.'},{status:429});
   try {
     const input=await body(request),parsed=claimSchema.safeParse(input);
-    const {draftVersion,inboxId}=z.object({draftVersion:z.number().int().positive().optional(),inboxId:z.string().regex(/^LOG-[a-zA-Z0-9-]{1,100}$/).optional()}).parse(input);
+    const {draftVersion,inboxId,repeatOf}=z.object({draftVersion:z.number().int().positive().optional(),inboxId:z.string().regex(/^LOG-[a-zA-Z0-9-]{1,100}$/).optional(),repeatOf:z.string().regex(/^CB-[a-zA-Z0-9-]{1,100}$/).optional()}).parse(input);
     if(!parsed.success)return Response.json({error:parsed.error.issues.map(i=>i.message).join(' ')},{status:400});
     if(parseGmgnAssetId(parsed.data.asset)&&!knownAsset(parsed.data.asset))return Response.json({error:'Search for and select this GMGN token first so its identity can be preserved.'},{status:400});
     const owner = principal(request)!.id;
-    const id = capture(parsed.data,owner,draftVersion,inboxId);
+    const id = capture(parsed.data,owner,draftVersion,inboxId,repeatOf);
     const review = await automaticRecall(owner,id).catch(() => undefined);
     return Response.json({id,review},{status:201});
   } catch(error) {

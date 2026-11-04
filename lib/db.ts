@@ -1,3 +1,4 @@
+import {lockAgainSeed} from './lock-again';
 import {horizonHours} from './horizons';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -53,17 +54,20 @@ export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("S
 export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}
 export function registerAsset(asset:Asset){db().prepare('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?)').run(asset.id,asset.symbol,asset.name,asset.provider,asset.chain||null,asset.address||null,asset.discoveredAt||new Date().toISOString());}
 export function knownAsset(id:string):Asset|null{const row=db().prepare('SELECT * FROM assets WHERE id=?').get(id) as Record<string,string>|undefined;return row?{id:row.id,symbol:row.symbol,name:row.name,provider:row.provider as Asset['provider'],chain:row.chain,address:row.address}:null;}
-export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string) {
+export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string) {
+  if(repeatOf){const prior=listReceipts(ownerId).find(row=>row.id===repeatOf);if(!prior||!lockAgainSeed(prior))throw new Error('VERIFIED_PRIOR_RECEIPT_REQUIRED');}
+  db().exec('CREATE TABLE IF NOT EXISTS receipt_repeat_links (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id),original_id TEXT NOT NULL REFERENCES predictions(id))');
   const assetMetadata=knownAsset(claim.asset);
   if(parseGmgnAssetId(claim.asset)&&!assetMetadata)throw new Error('GMGN token must be discovered and selected first');
   const now = new Date(), id = `CB-${randomUUID()}`;
   const deadline = new Date(now.getTime()+horizonHours[claim.horizon]*3600_000).toISOString();
-  const snapshot = JSON.stringify({...claim,id,lockedAt:now.toISOString(),deadline,method:'directional-open-v1',...(assetMetadata?{assetMetadata}:{})});
-  const fingerprint = hash(JSON.stringify([...(ownerId==='operator'?[]:[ownerId]),claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon]));
+  const snapshot = JSON.stringify({...claim,id,lockedAt:now.toISOString(),deadline,method:'directional-open-v1',...(repeatOf?{repeatedFrom:repeatOf}:{}),...(assetMetadata?{assetMetadata}:{})});
+  const fingerprint = hash(JSON.stringify([...(ownerId==='operator'?[]:[ownerId]),claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon,...(repeatOf?['repeat',repeatOf]:[])]));
   const database = db(); database.exec('BEGIN IMMEDIATE');
   try {
     if (inboxId && !database.prepare('SELECT 1 FROM call_inbox WHERE id=? AND owner_id=?').get(inboxId,ownerId)) throw new Error('INBOX_NOT_FOUND');
     database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,claim.caller,claim.asset,claim.direction,claim.horizon,claim.text,claim.sourceUrl,now.toISOString(),deadline,fingerprint,hash(snapshot),'self_logged_before_outcome',snapshot);
+    if(repeatOf)database.prepare('INSERT INTO receipt_repeat_links VALUES (?,?)').run(id,repeatOf);
     if (inboxId) database.prepare('INSERT INTO receipt_inbox_links VALUES (?,?)').run(id,inboxId);
     database.prepare('INSERT INTO prediction_owners VALUES (?,?)').run(id,ownerId);
     database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_locked',hash(snapshot),now.toISOString());

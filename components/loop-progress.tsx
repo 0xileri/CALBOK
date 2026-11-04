@@ -21,7 +21,7 @@ export function LoopProgress({receipts}:{receipts:Receipt[]}) {
       .then(setProof)
       .catch(()=>{if(!controller.signal.aborted)setFailed(true);});
     return ()=>{controller.abort();window.clearInterval(timer);};
-  },[]);
+  },[receipts]);
   return <section className="panel info-card" aria-label="Integration progress">
     <h3>Integration progress</h3>
     <h4>Next settlement deadlines</h4>
@@ -30,9 +30,9 @@ export function LoopProgress({receipts}:{receipts:Receipt[]}) {
     </li>)}</ul>:<p>No upcoming deadlines.</p>}
     {!proof?<p>{failed?'Progress unavailable.':'Loading progress…'}</p>:<>
       <ul>{proof.stages.map(stage=><li key={stage.key}>{stage.label} · {stage.count}</li>)}</ul>
-      <h4>Verified memories toward caution</h4>
+      <h4>Verified memories toward caution</h4><p>Win rates use completed, verified wins and losses in each exact group. Neutral outcomes do not count toward the minimum of five. Reaching five makes a group eligible for review, not a guaranteed caution.</p>
       {proof.groups.length?<ul>{proof.groups.map(group=><li key={group.key}>
-        {group.caller} · {group.asset} · {group.direction} · {group.horizon} · {group.count}/5
+        {group.caller} · {group.asset} · {group.direction} · {group.horizon} · {group.count}/5 · win rate {group.winRate===null?'—':group.winRate+'%'}{group.closest?' · Closest to caution eligibility':''}
       </li>)}</ul>:<p>No locked calls yet.</p>}
     </>}
   </section>;

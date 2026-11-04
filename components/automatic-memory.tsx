@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useState} from 'react';
-type Status = {enabled:boolean; available:boolean; used:number; limit:number};
+type Status = {enabled:boolean; available:boolean; used:number; limit:number;queued:number;budgetBlocked:boolean};
 
 export function AutomaticMemory() {
   const [settings,setSettings] = useState<Status|null>(null);
@@ -16,12 +16,12 @@ export function AutomaticMemory() {
       });
     return () => controller.abort();
   },[]);
-  async function toggle() {
+  async function toggle(all=false) {
     if (!settings) return;
     setBusy(true);
     setError('');
     try {
-      const response = await fetch('/api/automatic-memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!settings.enabled})});
+      const response = await fetch('/api/automatic-memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(all?{action:'remember-all'}:{enabled:!settings.enabled})});
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setSettings(data);
@@ -35,8 +35,11 @@ export function AutomaticMemory() {
   return <section className="panel operator-settings">
     <h3>Auto-remember verified outcomes</h3>
     <p>{settings.enabled?'Enabled':'Off'} · {settings.used} of {settings.limit} automatic write attempts used.</p>
+    <p>{settings.queued} verified settled receipts waiting for submission. {settings.budgetBlocked?'The write budget is full. Use Remember all settled to approve the current backlog.':''}</p>
     <p>Enabling authorizes up to {settings.limit-settings.used} more Walrus Mainnet write attempts, including existing verified outcomes. Writes can spend from your Walrus account. Pausing takes effect before the next job starts.</p>
     <button className="button secondary" disabled={busy||(!settings.enabled&&(!settings.available||settings.used>=settings.limit))} onClick={()=>void toggle()}>{settings.enabled?'Pause auto-remember':'Enable auto-remember'}</button>
+    <p>Remember all settled approves the current verified backlog and enables its worker queue. It can spend from your Walrus account; new submissions remain limited to one per minute.</p>
+    <button className="button secondary" disabled={busy||!settings.available||settings.queued===0} onClick={()=>void toggle(true)}>Remember all settled</button>
     {error&&<p role="alert">{error}</p>}
   </section>;
 }

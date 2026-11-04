@@ -119,3 +119,12 @@ test('lock and worker recall share a durable claim and store one cited review',a
     database.close();
   }
 });
+
+test('progress ranks the closest exact group and computes win rate from verified completed wins and losses',()=>{
+ const rows=[receipt('CB-progress-a'),receipt('CB-progress-b'),{...receipt('CB-progress-c'),caller:'OTHER'}];
+ const completions=rows.map(row=>({prediction_id:row.id,job_id:'job-'+row.id,blob_id:'blob-'+row.id,network:'mainnet',completed_at:'1970-01-03T00:00:00.000Z'}));
+ const proof=integrationProof(rows,completions.map(row=>({...row,status:'done',namespace:'test'})),completions,[],[]);
+ assert.deepEqual(proof.groups.map(g=>({caller:g.caller,count:g.count,winRate:g.winRate,closest:g.closest})),[
+  {caller:'TEST',count:2,winRate:'0.0',closest:true},{caller:'OTHER',count:1,winRate:'0.0',closest:false}
+ ]);
+});

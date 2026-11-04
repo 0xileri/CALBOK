@@ -14,7 +14,7 @@ The loop runs once a minute, processes at most three due receipts, and requests 
 
 Job state, next retry, attempts, sanitized error codes, and a worker heartbeat are visible in Integration settings and receipt details. Status refreshes every 30 seconds while the browser is visible. The UI displays the latest 100 jobs; the worker processes the full queue. Each job has a two-minute lease; an abandoned job can be recovered after expiry. Settlement, job completion, and its audit event commit together. Manual and automatic settlement share the same lease and immutable outcome contract.
 
-Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. Automatic Walrus Mainnet writes default on for the operator; an explicit saved off setting stays off. The owner can pause them in Integration settings. The worker reserves at most ten automatic attempts, including eligible existing settlements, and checks accepted jobs by ID. Recall is initiated from the receipt. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
+Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. Automatic Walrus Mainnet writes default on for the operator; an explicit saved off setting stays off. The owner can pause them in Integration settings. The initial budget permits ten automatic attempts, including eligible existing settlements. The owner can explicitly approve the current backlog with Remember all settled. The worker checks accepted jobs by ID. Recall is initiated from the receipt. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
 
 ## Browser sign-in
 
@@ -22,10 +22,10 @@ Owner browser login uses the existing `CALBOK_ADMIN_TOKEN` under Workspace owner
 
 Set these runtime variables for owner email login.
 
-- `RESEND_API_KEY`
-- `CALBOK_EMAIL_FROM` with a sender on a domain verified in Resend
-- `CALBOK_OWNER_EMAIL` with the lowercase owner address
-- `CALBOK_SESSION_SECRET` with at least 32 random characters
+- `RESEND_API_KEY`: Resend sending key, format `re_...` (use your own key, never commit it).
+- `CALBOK_EMAIL_FROM`: sender on a domain verified in Resend, for example `CALBOK <login@calbok.xyz>`.
+- `CALBOK_OWNER_EMAIL`: lowercase owner address, for example `owner@example.com`.
+- `CALBOK_SESSION_SECRET`: at least 32 random characters; format example `<64 random hexadecimal characters>` (generate locally; do not use a literal example).
 
 Set `CALBOK_PUBLIC_SIGNIN_ENABLED=false` and `CALBOK_USER_PROVIDER_ACCESS=false` for this private workspace.
 
@@ -46,8 +46,16 @@ Schema additions are additive: `prediction_owners`, `accounts`, `sessions`, `log
 
 For catalog assets, pricing tries Tatum, then Coinbase USD candles when Tatum is stale or has no matching boundary, then Binance public spot USDT klines when Coinbase has no symbol or eligible history. Binance evidence retains the exact pair, raw kline and SHA-256 hash. USD and USDT candles are never mixed within one settlement. Only exact spot base symbols are used; scaled `1000` pairs are not substituted. GMGN remains the exclusive source for `gmgn:` assets.
 
-Settlements (manual and worker) enqueue verified operator outcomes for memory. Worker startup and each cycle backfill the durable queue. Dispatch is limited to one new automatic submission per minute and ten budgeted writes total; extra queued receipts wait for operator action on the budget. Confirmed failed automatic submissions refund the budget and retry with exponential backoff, up to eight failures before manual review. Uncertain acceptance never resubmits automatically. Pending jobs have polling priority, even with writes off. Manual failures remain manual-only. Confirmed completion triggers automatic recall for the same owner, preserving the before-lock citation checks.
+Settlements (manual and worker) enqueue verified operator outcomes for memory. Worker startup and each cycle backfill the durable queue. Dispatch is limited to one new automatic submission per minute and an initial budget of ten writes; extra queued receipts wait for operator action on the budget. Confirmed failed automatic submissions refund the budget and retry with exponential backoff, up to eight failures before manual review. Uncertain acceptance never resubmits automatically. Pending jobs have polling priority, even with writes off. Manual failures remain manual-only. Confirmed completion triggers automatic recall for the same owner, preserving the before-lock citation checks.
 
 Deployment `binance-fallback-v2` requeues unsettled jobs paused for `TATUM_STALE_CANDLE` or `TATUM_PRICE_BOUNDARY_UNAVAILABLE` once. Other manual-review jobs and all immutable settlements stay unchanged.
 
 If the Binance trading API host rejects the deployment location (HTTP 403/451), pricing uses Binance's documented public market-data-only host, `data-api.binance.vision`, for the same klines endpoint. This requires no account or API key and does not grant trading access. See https://github.com/binance/binance-spot-api-docs/blob/master/faqs/market_data_only.md.
+
+### Memory backlog and owner approval
+
+The ledger lists provider jobs, while the durable automatic queue includes receipts waiting to be submitted. They are different counts. The default ten-write budget and one new submission per minute can leave many settled receipts without a provider job yet. Settings now displays the waiting count and whether the budget is blocking it. The owner-only **Remember all settled** action backfills eligible receipts and explicitly approves enough budget for the current verified backlog, then enables automatic dispatch. Repeated clicks do not double the budget or create duplicate jobs. This does not change the dispatch rate, pending-job priority, uncertain-submission protection, or manual-only failed jobs. Future receipts outside that approval remain subject to the approved limit.
+
+**Lock again** copies a verified settled receipt into a review form. Confirmation creates a new linked receipt at server time and uses the normal settlement, memory and recall flow. It does not backdate the call or rewrite the original. Identical requests repeating the same original receipt are deduplicated. Repeating a historical prediction is a new prospective statement, not independent evidence that its author made another post.
+
+Settings checks the four email variable names without returning their values. **Send owner sign-in test** sends through the normal one-time-code delivery path and normal login rate limits. Provider acceptance proves Resend accepted the request; inbox delivery and completing the sign-in still need to be confirmed by the owner. Public sign-in and member provider access remain disabled.

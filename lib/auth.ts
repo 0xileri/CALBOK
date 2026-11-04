@@ -101,6 +101,20 @@ function signingKey() {
   return process.env.CALBOK_SESSION_SECRET || process.env.CALBOK_ADMIN_TOKEN;
 }
 
+export function emailSetupStatus() {
+  const required=['RESEND_API_KEY','CALBOK_EMAIL_FROM','CALBOK_OWNER_EMAIL','CALBOK_SESSION_SECRET'] as const;
+  const missing=required.filter(name=>!process.env[name]?.trim());
+  const invalid:string[]=[];
+  if(process.env.CALBOK_SESSION_SECRET && process.env.CALBOK_SESSION_SECRET.length<32)invalid.push('CALBOK_SESSION_SECRET');
+  if(process.env.CALBOK_OWNER_EMAIL && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail()||''))invalid.push('CALBOK_OWNER_EMAIL');
+  return {configured:missing.length===0&&invalid.length===0,missing,invalid};
+}
+
+export async function testOwnerEmail() {
+  if(!emailSetupStatus().configured)throw new Error('Complete the four email settings before sending a test.');
+  await requestCode(ownerEmail()!);
+}
+
 export function emailReady(): boolean {
   return !!(process.env.RESEND_API_KEY && process.env.CALBOK_EMAIL_FROM && ownerEmail() && (signingKey()?.length ?? 0)>=32);
 }

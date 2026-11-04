@@ -121,16 +121,18 @@ function nextStep(locked: Receipt[], settlements: ReturnType<typeof settlementRe
 
 export function memoryGroupProgress(receipts: Receipt[], completed: CompletionProof[]) {
   const completedIds = new Set(completed.map(row=>row.prediction_id));
-  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number}>();
+  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number;wins:number;losses:number}>();
   for (const receipt of receipts.filter(isLocked)) {
     const {caller,asset,direction,horizon} = receipt;
     const key = JSON.stringify([caller.trim().toLowerCase(),asset,direction,horizon]);
-    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0};
+    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0,wins:0,losses:0};
     const outcome = profileOutcome(receipt);
-    if (completedIds.has(receipt.id) && (outcome==='won' || outcome==='lost')) group.count++;
+    if (completedIds.has(receipt.id) && (outcome==='won' || outcome==='lost')) {group.count++;if(outcome==='won')group.wins++;else group.losses++;}
     groups.set(key,group);
   }
-  return [...groups.values()].sort((a,b)=>b.count-a.count);
+  const result=[...groups.values()].map(group=>({...group,winRate:group.count?(group.wins/group.count*100).toFixed(1):null,remaining:Math.max(0,5-group.count)}));
+  const closest=Math.min(...result.filter(group=>group.count>0).map(group=>group.remaining));
+  return result.map(group=>({...group,closest:group.count>0&&group.remaining===closest})).sort((a,b)=>a.remaining-b.remaining||b.count-a.count||a.key.localeCompare(b.key));
 }
 
 export function integrationProof(receipts: Receipt[], jobs: MemoryJob[], completions: CompletionProof[], recalls: RecallProof[], onchain: OnchainProof[]) {

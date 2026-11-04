@@ -17,6 +17,7 @@ function automaticSchema() {
       id TEXT PRIMARY KEY, prediction_id TEXT NOT NULL REFERENCES predictions(id),
       decision TEXT NOT NULL, candidate_blob_id TEXT NOT NULL, resolved_by TEXT NOT NULL, resolved_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS automatic_memory_queue (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), failures INTEGER NOT NULL DEFAULT 0, due_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS automatic_memory_budget (id INTEGER PRIMARY KEY CHECK(id=1), write_limit INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS automatic_memory_dispatch (id INTEGER PRIMARY KEY CHECK(id=1), due_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS automatic_memory_poll (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), attempts INTEGER NOT NULL, due_at TEXT NOT NULL);`);
 }
@@ -24,7 +25,9 @@ export function automaticMemoryStatus() {
   automaticSchema();
   const setting = db().prepare('SELECT enabled FROM automatic_memory_setting WHERE id=1').get();
   const used = Number(db().prepare('SELECT COUNT(*) AS count FROM automatic_memory_attempts').get()?.count);
-  return {enabled: !setting || setting.enabled === 1, used, limit: automaticLimit, available: configuration().walrus && configuration().mainnet && process.env.CALBOK_WORKER_ENABLED === 'true'};
+  const limit=Number(db().prepare('SELECT write_limit FROM automatic_memory_budget WHERE id=1').get()?.write_limit??automaticLimit);
+  const queued=eligibleMemoryReceipts().length;
+  return {enabled: !setting || setting.enabled === 1, used, queued, budgetBlocked:used>=limit&&queued>0, limit, available: configuration().walrus && configuration().mainnet && process.env.CALBOK_WORKER_ENABLED === 'true'};
 }
 export function setAutomaticMemory(enabled: boolean) {
   automaticSchema();
@@ -257,6 +260,31 @@ export function queueSettledMemory(receipt: Receipt) {
 export function backfillSettledMemories() {
   for (const receipt of listReceipts('operator')) queueSettledMemory(receipt);
 }
+function eligibleMemoryReceipts() {
+  return listReceipts('operator').filter(receipt=>{
+    if(!['won','lost','neutral'].includes(profileOutcome(receipt)))return false;
+    const job=db().prepare('SELECT status FROM memory_jobs WHERE prediction_id=?').get(receipt.id);
+    return !job || job.status==='retryable';
+  });
+}
+/** The owner approves only the currently settled backlog; the dispatch rate never increases. */
+export function rememberAllSettled(actor:{id:string;role:string}) {
+  if(actor.id!=='operator'||actor.role!=='operator')return {status:403,message:'Owner access required.'};
+  const settings=automaticMemoryStatus();
+  if(!settings.available)return {status:409,message:'Configure the worker and Walrus Mainnet first.'};
+  const database=db();
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    backfillSettledMemories();
+    const used=Number(database.prepare('SELECT COUNT(*) n FROM automatic_memory_attempts').get()!.n);
+    const limit=Math.max(settings.limit,used+eligibleMemoryReceipts().length);
+    database.prepare('INSERT INTO automatic_memory_budget VALUES (1,?) ON CONFLICT(id) DO UPDATE SET write_limit=MAX(write_limit,excluded.write_limit)').run(limit);
+    setAutomaticMemory(true);
+    database.exec('COMMIT');
+  }catch(error){database.exec('ROLLBACK');throw error;}
+  return {status:200,message:'Settled receipts queued. The worker submits at most one new job per minute.',...automaticMemoryStatus()};
+}
+
 function backoffMemory(id:string) {
   db().prepare(`INSERT INTO automatic_memory_queue(prediction_id,failures,due_at) VALUES (?,1,?)
     ON CONFLICT(prediction_id) DO UPDATE SET failures=failures+1,due_at=excluded.due_at`)

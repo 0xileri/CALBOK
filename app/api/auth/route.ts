@@ -1,10 +1,10 @@
 import {z} from 'zod';
 import {accountDetails} from '@/lib/account-profile';
 import {body,originGuard} from '@/lib/http';
-import {cookie,createSession,emailReady,matchesOperator,principal,requestCode,revokeSession,verifyCode} from '@/lib/auth';
+import {cookie,createSession,emailReady,emailSetupStatus,testOwnerEmail,matchesOperator,principal,requestCode,revokeSession,verifyCode} from '@/lib/auth';
 export const runtime='nodejs';
 const response=(data:unknown,status=200,headers:Record<string,string>={})=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...headers}});
-export async function GET(request:Request){const denied=originGuard(request);if(denied)return denied;const user=principal(request);return response({user:user?accountDetails(user):null,emailAvailable:emailReady(),publicSignup:process.env.CALBOK_PUBLIC_SIGNIN_ENABLED==='true'});}
+export async function GET(request:Request){const denied=originGuard(request);if(denied)return denied;const user=principal(request);return response({user:user?accountDetails(user):null,emailAvailable:emailReady(),...(user?.role==='operator'?{emailSetup:emailSetupStatus()}:{}),publicSignup:process.env.CALBOK_PUBLIC_SIGNIN_ENABLED==='true'});}
 export async function POST(request:Request){
   const denied=originGuard(request,true);if(denied)return denied;
   try {
@@ -12,8 +12,10 @@ export async function POST(request:Request){
       z.object({action:z.literal('request'),email:z.email().max(254).transform(value=>value.trim().toLowerCase())}),
       z.object({action:z.literal('verify'),id:z.uuid(),code:z.string().regex(/^\d{8}$/)}),
       z.object({action:z.literal('operator'),token:z.string().max(512)}),
-      z.object({action:z.literal('logout')})
+      z.object({action:z.literal('logout')}),
+      z.object({action:z.literal('test-email')})
     ]).parse(await body(request));
+    if(input.action==='test-email'){if(principal(request)?.role!=='operator')return response({error:'Owner access required.'},403);await testOwnerEmail();return response({message:'Resend accepted a sign-in email for the configured owner. Check the owner inbox to confirm delivery.'});}
     if(input.action==='logout'){revokeSession(request);return response({message:'Signed out.'},200,{'Set-Cookie':cookie('',request,true)});}
     if(input.action==='operator'){
       if(!matchesOperator(input.token))return response({error:'Access key not recognized.'},401);
