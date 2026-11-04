@@ -42,3 +42,12 @@ test('fallback order is Tatum then Coinbase then Binance; valid Coinbase never c
   assert.equal((await assetCandles('STX',minute))[0].provider,'Coinbase');assert.equal(calls.length,2);
  }finally{globalThis.fetch=original;if(key===undefined)delete process.env.TATUM_API_KEY;else process.env.TATUM_API_KEY=key;}
 });
+
+test('Binance uses its documented market-data-only service when the trading API host rejects the location',async()=>{
+ const original=globalThis.fetch;const hosts:string[]=[];
+ try {
+  globalThis.fetch=async input=>{const url=new URL(String(input));hosts.push(url.hostname);return url.hostname==='api.binance.com'?new Response('',{status:451}):Response.json([raw]);};
+  assert.equal((await binanceCandles('STX',minute,()=>minute+60000))[0].product,'STXUSDT');
+  assert.deepEqual(hosts,['api.binance.com','data-api.binance.vision']);
+ }finally{globalThis.fetch=original;}
+});

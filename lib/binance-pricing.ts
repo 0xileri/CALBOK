@@ -26,8 +26,16 @@ export async function binanceCandles(asset:string,boundary:number,clock=Date.now
   const url=new URL('https://api.binance.com/api/v3/klines');
   // Only exact spot base identities; never silently substitute 1000x pairs.
   url.search=new URLSearchParams({symbol:asset+'USDT',interval:'1m',startTime:String(minute),limit:'1'}).toString();
-  const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000)});
-  if(!response.ok) throw new ProviderError('BINANCE_PRICE_UNAVAILABLE');
+  let response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000)});
+  if(response.status===451 || response.status===403) {
+    // Binance documents this separate public market-data service (no account/trading access).
+    url.hostname='data-api.binance.vision';
+    response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000)});
+  }
+  if(!response.ok) {
+    console.warn('Binance candle unavailable',{asset,status:response.status});
+    throw new ProviderError('BINANCE_PRICE_UNAVAILABLE');
+  }
   const raw:unknown=await response.json();
   if(!Array.isArray(raw)) throw new ProviderError('BINANCE_PRICE_UNVERIFIED');
   const candles=raw.map(row=>normalizeBinanceCandle(asset,row));

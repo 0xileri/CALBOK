@@ -1,3 +1,4 @@
+import {coinbaseCandles} from './coinbase-pricing';
 import {binanceCandles} from './binance-pricing';
 import {entryPriceTick} from './entry-price';
 import {automaticRecall} from './receipt-recall';
@@ -42,7 +43,13 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     let pair=await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))]);
     if(fetchCandles===assetCandles && pair[0][0]?.provider!==pair[1][0]?.provider && !parseGmgnAssetId(receipt.asset)) {
       // Compare like quotes from one venue; never mix Coinbase USD and Binance USDT.
-      pair=await Promise.all([binanceCandles(receipt.asset,Date.parse(receipt.locked_at)),binanceCandles(receipt.asset,Date.parse(receipt.deadline))]);
+      if(!pair.some(rows=>rows[0]?.provider==='Binance')) {
+        try {pair=await Promise.all([coinbaseCandles(receipt.asset,Date.parse(receipt.locked_at)),coinbaseCandles(receipt.asset,Date.parse(receipt.deadline))]);}
+        catch(error) {
+          if(!(error instanceof ProviderError) || !['COINBASE_MARKET_UNSUPPORTED','COINBASE_BOUNDARY_UNAVAILABLE'].includes(error.code)) throw error;
+        }
+      }
+      if(pair[0][0]?.provider!==pair[1][0]?.provider) pair=await Promise.all([binanceCandles(receipt.asset,Date.parse(receipt.locked_at)),binanceCandles(receipt.asset,Date.parse(receipt.deadline))]);
     }
     const candles=pair.flat();
     const result=settle(receipt.direction as 'bullish'|'bearish',Date.parse(receipt.locked_at),Date.parse(receipt.deadline),candles,clock());
@@ -74,7 +81,7 @@ export function requeueStaleSettlementJobs(now=Date.now()) {
   database.exec('CREATE TABLE IF NOT EXISTS settlement_recoveries (name TEXT PRIMARY KEY)');
   database.exec('BEGIN IMMEDIATE');
   try {
-    const claimed=database.prepare("INSERT OR IGNORE INTO settlement_recoveries VALUES ('binance-fallback-v1')").run();
+    const claimed=database.prepare("INSERT OR IGNORE INTO settlement_recoveries VALUES ('binance-fallback-v2')").run();
     if(claimed.changes) database.prepare(`UPDATE settlement_jobs SET status='retry',attempts=0,next_attempt_at=?,lease_token=NULL,lease_until=NULL,updated_at=?
       WHERE status='paused' AND last_error IN ('TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE')
       AND NOT EXISTS(SELECT 1 FROM settlements s WHERE s.prediction_id=settlement_jobs.prediction_id)`)

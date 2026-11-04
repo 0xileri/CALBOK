@@ -48,4 +48,6 @@ For catalog assets, pricing tries Tatum, then Coinbase USD candles when Tatum is
 
 Settlements (manual and worker) enqueue verified operator outcomes for memory. Worker startup and each cycle backfill the durable queue. Dispatch is limited to one new automatic submission per minute and ten budgeted writes total; extra queued receipts wait for operator action on the budget. Confirmed failed automatic submissions refund the budget and retry with exponential backoff, up to eight failures before manual review. Uncertain acceptance never resubmits automatically. Pending jobs have polling priority, even with writes off. Manual failures remain manual-only. Confirmed completion triggers automatic recall for the same owner, preserving the before-lock citation checks.
 
-Deployment `binance-fallback-v1` requeues unsettled jobs paused for `TATUM_STALE_CANDLE` or `TATUM_PRICE_BOUNDARY_UNAVAILABLE` once. Other manual-review jobs and all immutable settlements stay unchanged.
+Deployment `binance-fallback-v2` requeues unsettled jobs paused for `TATUM_STALE_CANDLE` or `TATUM_PRICE_BOUNDARY_UNAVAILABLE` once. Other manual-review jobs and all immutable settlements stay unchanged.
+
+If the Binance trading API host rejects the deployment location (HTTP 403/451), pricing uses Binance's documented public market-data-only host, `data-api.binance.vision`, for the same klines endpoint. This requires no account or API key and does not grant trading access. See https://github.com/binance/binance-spot-api-docs/blob/master/faqs/market_data_only.md.
