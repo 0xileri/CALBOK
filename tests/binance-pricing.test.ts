@@ -1,3 +1,6 @@
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {SettlementEvidence} from '../components/settlement-evidence';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {binanceCandles,normalizeBinanceCandle,verifiedBinanceCandle} from '../lib/binance-pricing';
@@ -25,7 +28,10 @@ test('Binance preserves pair and raw hash, accepts exact finalized boundaries, r
   await assert.rejects(binanceCandles('STX',minute,()=>minute+59999),/BOUNDARY_UNAVAILABLE/);
   const exit=normalizeBinanceCandle('STX',[minute+86400000,...raw.slice(1,6),minute+86459999,...raw.slice(7)]);
   const result=settle('bullish',minute-35000,minute+86400000-35000,[candle,exit],exit.closeTime);
-  assert.equal(profileOutcome({asset:'STX',direction:'bullish',locked_at:new Date(minute-35000).toISOString(),deadline:new Date(minute+86400000-35000).toISOString(),outcome:result.outcome,method:'directional-open-v1',evidence:JSON.stringify({...result,asset:'STX',provider:'Binance'})} as Receipt),'neutral');
+  const receipt={asset:'STX',direction:'bullish',locked_at:new Date(minute-35000).toISOString(),deadline:new Date(minute+86400000-35000).toISOString(),outcome:result.outcome,method:'directional-open-v1',evidence:JSON.stringify({...result,asset:'STX',provider:'Binance'})} as Receipt;
+  assert.equal(profileOutcome(receipt),'neutral');
+  const html=renderToStaticMarkup(createElement(SettlementEvidence,{receipt,entryPrice:{candle:null,error:'TATUM_PRICE_BOUNDARY_UNAVAILABLE'}}));
+  assert.match(html,/USDT candle open/);assert.match(html,/STXUSDT/);assert.doesNotMatch(html,/USD candle open|Manual review is required/);
  }finally{globalThis.fetch=original;}
 });
 test('fallback order is Tatum then Coinbase then Binance; valid Coinbase never calls Binance',async()=>{
