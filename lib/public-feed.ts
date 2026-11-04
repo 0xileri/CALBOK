@@ -41,10 +41,12 @@ function projectRows(rows:ReturnType<typeof publicRows>){
   return rows.map(({receipt:row,loggedBy})=>{
     const outcome=profileOutcome(row),verified=['won','lost','neutral'].includes(outcome);
     // profileOutcome has validated the evidence before any settlement field is exposed.
-    const evidence=verified?JSON.parse(row.evidence!) as {returnPct:string;provider:string;entry:{provider?:string};exit:{provider?:string}}:null;
+    const evidence=verified?JSON.parse(row.evidence!) as {returnPct:string;provider:string;entry:{provider?:string;hash:string};exit:{provider?:string;hash:string}}:null;
     return {id:row.id,caller:row.caller,loggedBy,asset:row.asset,direction:row.direction,horizon:row.horizon,
+      assetSymbol:row.asset_symbol&&/^[a-zA-Z0-9$._-]{1,24}$/.test(row.asset_symbol)?row.asset_symbol:null,
       locked_at:row.locked_at,deadline:row.deadline,outcome,
       returnPct:evidence?.returnPct??null,provider:evidence?.provider??null,
+      entryHash:evidence?.entry.hash??null,exitHash:evidence?.exit.hash??null,
       snapshotHash:row.snapshot_hash,blobId:completed.find(proof=>proof.prediction_id===row.id)?.blob_id??null,
       provenance:'self-logged before outcome' as const,ownerScheduled:!!scheduledRepeat(row)};
   });
@@ -61,6 +63,7 @@ function paginate(rows:ReturnType<typeof publicRows>,query:FeedQuery){
   return {calls:projectRows(rows.slice(start,start+query.pageSize)),page:query.page,pageSize:query.pageSize,total:rows.length,hasMore:start+query.pageSize<rows.length};
 }
 export function publicFeed(query:FeedQuery){return paginate(filteredRows(query),query);}
+export function publicCallById(id:string){const row=publicRows().find(row=>row.receipt.id===id);return row?projectRows([row])[0]:null;}
 export function publicCaller(handle:string,query:FeedQuery){
   if(!publicCallerAllowed(handle)||handle.length>60)return null;
   const all=publicRows().filter(({receipt})=>canonicalCaller(receipt.caller)===canonicalCaller(handle));

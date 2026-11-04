@@ -115,7 +115,8 @@ test('public proof page needs no session and exposes only verified owner evidenc
  db().prepare('INSERT INTO memory_completion_proofs VALUES (?,?,?,?,?)').run(id,'PRIVATE_JOB','PUBLIC_BLOB','mainnet',new Date(now).toISOString());
  const proof=ownerPublicProof();assert.deepEqual(proof.receipts.map(r=>r.id),[id]);assert.equal(proof.receipts[0].blobId,'PUBLIC_BLOB');assert.equal(proof.receipts[0].provider,'Coinbase');
  assert.equal(proof.stages.find(stage=>stage.key==='lock')?.count,1);assert.ok(!JSON.stringify(proof).includes(stillPrivate));
- const html=renderToStaticMarkup(ProofPage()),serialized=JSON.stringify(proof);
+ assert.throws(()=>ProofPage(),error=>String((error as {digest?:string}).digest).includes('NEXT_REDIRECT')&&String((error as {digest?:string}).digest).includes('/feed'));
+ const html=renderToStaticMarkup(createElement(PublicProofView,{proof})),serialized=JSON.stringify(proof);
  assert.match(html,/Public integration proof/);assert.match(html,/PUBLIC_BLOB/);
  for(const secret of [...privateValues,'PRIVATE_NAMESPACE','PRIVATE_JOB',process.env.CALBOK_ADMIN_TOKEN!]){assert.ok(!html.includes(secret));assert.ok(!serialized.includes(secret));}
  for(const forbidden of ['email','text','snapshot','source_url','namespace','review','inbox','token'])assert.ok(!Object.keys(proof.receipts[0]).includes(forbidden));

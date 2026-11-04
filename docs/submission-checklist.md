@@ -39,3 +39,7 @@ The original brief cites 10 November 2026 at 17:00 UTC (18:00 Lagos). This date 
 - Verify owner abuse hiding removes a call from feed, caller stats and public proof while retaining the immutable record and audit event.
 - Public DTO tests cover emails, account/job IDs, text, notes, inbox data, raw memories and credentials; only receipt IDs, requested proof hashes and confirmed blob IDs leave these views.
 - Member limits: 20 locks/UTC hour, 10 memory submission attempts/UTC day. Per-IP sign-in limit: 30 attempts per 15-minute window. Operator budgets remain approval-based.
+
+## Simple judging interface
+
+Use Home → Feed → Call → Caller without signing in. Use Sign in → Log a call → Confirm → Call → My calls for the logger journey. Proof details start collapsed. Owner diagnostics, proof counts, memory jobs, repeat series and settings are under Admin; `/proof` is a compatibility redirect to Feed. The homepage ticker contains only real published calls and uses a 45-second cache, with pause/swipe and reduced-motion support. Existing private calls remain private; choose what to publish explicitly after setting a public username.

@@ -8,25 +8,27 @@ A private prediction accountability app: lock prospective market calls, inspect 
 
 ## For judges
 
-Live app: [calbok.xyz](https://calbok.xyz/). Sign-in is open and uses **email only with a one-time code**, no password. Every new account starts with an empty private journal; the owner's history is separate. [See live calls](https://calbok.xyz/feed) without signing in.
+Open [calbok.xyz](https://calbok.xyz/). Viewers need no account. Loggers sign in with **email and a one-time code**, never a password.
 
-1. Sign in, then choose **Lock your first 15m call** on Overview. Enter a real caller label and original prediction, select the exact market and direction, review the 15-minute horizon, and confirm. The server sets the lock time; pasted posts never backdate it.
-2. Watch the receipt and Due next panel. The worker observes the deadline within a minute and waits for the first eligible 1-minute exit candle to finalize. Missing prices remain unresolved. Inspect the provider and stored entry/exit evidence after settlement.
-3. With the worker, Walrus Mainnet and member provider access enabled, the verified outcome is queued for memory automatically. Inspect the memory ledger until the job is done with a blob ID; Remember outcome also uses the same safe path.
-4. Use Lock again on a remembered receipt to confirm a later same-group prediction. Recall runs on lock when matching prior memories completed before it; Check context also runs it explicitly. A first call has no prior memories to cite. Caution needs at least five completed matching wins/losses with a win rate below 40%, never a manufactured result.
+| Page | What to do |
+| --- | --- |
+| [Home](https://calbok.xyz/) | Read the purpose, log a call, and watch a ticker of real public calls. An empty feed shows “No public calls yet. Be the first.” |
+| [Feed](https://calbok.xyz/feed) | Filter public calls by caller, asset, window and result. Open any card to see its call page. |
+| Call: /call/<id> | See the caller, asset, direction, window, lock time and checked result. Expand **Proof details** for price source, record/price fingerprints and confirmed Walrus memory ID. |
+| Caller: /caller/<handle> | Inspect that named caller’s public win rate, call count and recent calls. The username of the logger is separate from the named caller. |
+| [Log a call](https://calbok.xyz/log) | Choose caller, exact asset, Bullish/Bearish, 15m/1h/4h/24h/7d, optional source and Public/Private. Review, confirm, then land directly on the locked call. |
+| [My calls](https://calbok.xyz/my-calls) | Follow your own open calls and results. A qualifying caution appears clearly beside the matching call. |
+| [Sign in](https://calbok.xyz/signin) | Enter one email field, then the one-time code. Each new account starts empty. |
+| Account → Profile | Set a unique public username before publishing. Your email never appears on public calls. |
+| [Admin](https://calbok.xyz/admin) | Owner only: integration proof counts, memory jobs, repeat series, provider settings and abuse moderation. |
 
-[Owner's published proof stage counts and settled receipts](https://calbok.xyz/proof) require no sign-in. Production check on 4 November 2026: **34 locks, 33 settled, 32 Mainnet memories, 1 cited recall, caution pending (0)**. These are dated observations of the private owner workspace. The public proof page now counts only explicitly published, visible owner receipts, so its counts can be lower. Existing receipts are not published automatically.
+A logger’s first run: sign in, open **Log a call**, choose genuine prediction terms and a **15m** window, then review and confirm. Original post text can be pasted optionally. If omitted, the review formats only the explicit terms chosen by the logger; no call exists until confirmation. The server assigns the lock time. After the window ends, the worker waits for the eligible price candle to finalize. Missing data stays unresolved. Completed, verified results follow the existing remember path; a later matching call can recall them. Caution still needs at least five matching completed wins/losses with a win rate below 40%.
 
-Judge accounts are limited to 20 locks per UTC hour, 10 new memory submission attempts per UTC day, and 60 settlement/recall/status operations per UTC hour. Viewing public proof uses no provider quota.
+Calls default to **Private**. Publishing requires a public username and explicit confirmation, and cannot be reversed. Existing calls are never published by deployment. Public views omit emails, original text, source URLs, notes, inbox data, account/job IDs, raw memory text and credentials. Owner abuse hiding keeps the immutable record and audit event. Old receipt-fragment links still open the new call page; /proof now redirects to Feed, with the technical stage dashboard under Admin.
 
-Examples of genuine stored settlements:
+The homepage ticker reads **GET /api/public-feed?limit=24**, cached for **45 seconds**. It uses CSS transform animation, pauses on hover, keyboard focus or touch, has a Play/Pause control, supports horizontal swiping, and stops moving for reduced-motion preferences. The duplicated animation track is hidden from assistive technology. No sample cards or invented outcomes fill empty space. Feed and individual-call APIs remain uncached; a cached ticker can take up to 45 seconds to reflect moderation.
 
-- [Coinbase-priced win: CB-4b3e0ed9-2576-466d-9fb7-24758f174f1f](https://calbok.xyz/proof#CB-4b3e0ed9-2576-466d-9fb7-24758f174f1f)
-- [Coinbase-priced loss: CB-dd78b73e-76de-4782-871c-62ac8fa05bdc](https://calbok.xyz/proof#CB-dd78b73e-76de-4782-871c-62ac8fa05bdc)
-- [Binance-priced win: CB-571c74f4-f880-48ec-bd04-be2b8a64fbb7](https://calbok.xyz/proof#CB-571c74f4-f880-48ec-bd04-be2b8a64fbb7)
-- [GMGN-priced loss: CB-0d806fe9-05b8-47eb-adc5-b55d6950244f](https://calbok.xyz/proof#CB-0d806fe9-05b8-47eb-adc5-b55d6950244f)
-
-How it works: **lock → settle against Tatum/Coinbase/Binance/GMGN candles → Walrus Mainnet memory → SQL-cited recall → caution warning**. Each stage requires stored verifiable evidence. Horizons, callers, exact assets and directions stay separate. Calls default to private. Set a unique public username in Account profile, then choose Public when locking or confirm Publish call later. Publishing is one-way; the public feed shows only allowlisted receipt fields, with the logger username separate from the named prediction caller.
+How it works: **Lock → Settle → Remember**. Settlement checks Tatum, Coinbase or Binance candles, with GMGN for onchain assets. Walrus Mainnet memory and SQL-checked recall can add context to later calls. Public stats use visible, public, reproducibly settled calls only. Member limits remain **20 locks per UTC hour and 10 memory submission attempts per UTC day**; owner approvals, per-IP sign-in limits and fail-closed rules stay in force.
 
 ## Status
 
@@ -34,7 +36,7 @@ This deployed app has email accounts, live settlements and confirmed Mainnet mem
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
-The overview includes a Due next deadline list, sorted oldest deadline first, with upcoming, eligible and paused-job filters. Deadlines use UTC; eligibility previews refresh every 30 seconds and wait one minute after the deadline. The server independently enforces settlement timing.
+My calls shows open windows and results, refreshed every 30 seconds. Call pages show the actual lock time and deadline; Admin holds the detailed job monitor. The server independently enforces eligible finalized candles and never substitutes a pre-lock price.
 
 Caller profiles include a searchable directory, performance filters by exact market, horizon and direction, and breakdowns with visible sample sizes. Win rates exclude pending, neutral and unreproducible results; stored candle evidence must reproduce the verdict. Receipt-history search, outcome filters and ordering do not change performance totals. Same-symbol tokens remain separate by chain and contract.
 
@@ -50,13 +52,13 @@ Copy-Item .env.example .env.local
 npm.cmd run dev
 ```
 
-Set a random `CALBOK_ADMIN_TOKEN` in `.env.local`, then open [CALBOK](http://127.0.0.1:3000) and use **Workspace owner access**. Local call capture works without provider keys. Store secrets only in `.env.local`; never paste them into a receipt.
+Set a random `CALBOK_ADMIN_TOKEN` in `.env.local`, then open [CALBOK](http://127.0.0.1:3000) and open **/admin** for owner-key access. Local call capture works without provider keys. Store secrets only in `.env.local`; never paste them into a receipt.
 
 1. Log a caller and original text. Search the 439-symbol Tatum catalog or use GMGN to select a token by chain and contract address. Coin, direction and horizon have no silent defaults.
 2. Review the original text, exact market, direction and horizon before confirming. Back to edit preserves the draft. Confirm to lock the server timestamp, deadline, structured contract and snapshot hash; review alone creates no receipt.
 3. Open the receipt to inspect its ID, UTC timestamps and source link. The settlement explanation shows reproducible entry/exit candle opens, market price change and the direction rule, with raw evidence available below. Use **Download PNG** for a branded image, or **Copy summary** for the full text record. PNGs are rendered locally in the browser; the expandable text preview also supports manual copying.
-4. After the deadline, use **Check settlement**. Missing credentials/coverage remain explicit errors; no result is invented.
-5. Once settled, use **Remember outcome**, then **Check context**. Only a completed job with a blob ID counts as a memory.
+4. After the deadline, open the call’s **Manage this call → Check result**. Missing credentials/coverage remain explicit errors; no result is invented.
+5. Once settled, use **Manage this call → Remember result**, then **Check past calls**. Only a completed job with a blob ID counts as a memory.
 
 ## Journal portability and memory inspection
 
@@ -96,7 +98,7 @@ npm.cmd run build
 - A Walrus timeout retains the accepted job for later status polling. Uncertain acceptance is blocked from automatic resubmission to avoid duplicate paid writes. Provider reconciliation is required.
 - Memory recall is semantically filtered, SQL-resolved and category-matched; it is neither complete history enumeration nor arithmetic authority. Minimum caution sample: 5.
 - Sui metadata proves coin identity, not historical USD pricing.
-- Fonts optionally load from Google Fonts; system fonts work offline.
+- System fonts keep the interface fast and work offline; external font requests are removed.
 
 ## Coin discovery and provider choice
 

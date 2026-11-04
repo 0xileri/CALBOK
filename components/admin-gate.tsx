@@ -1,0 +1,5 @@
+'use client';
+import {useState} from 'react';
+export function AdminGate(){const [token,setToken]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ return <main className="clean-auth"><header className="page-intro"><h1>Owner access</h1><p>This page is for the CALBOK owner.</p></header><form onSubmit={async event=>{event.preventDefault();setBusy(true);try{const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'operator',token})});const d=await r.json();if(!r.ok)throw Error(d.error);setToken('');window.location.assign(window.location.origin+'/admin');}catch(error){setMessage(error instanceof Error?error.message:'Access denied.');}finally{setBusy(false);}}}><label>Owner key<input required type="password" autoComplete="off" value={token} onChange={event=>setToken(event.target.value)}/></label><button className="primary-action" disabled={busy}>{busy?'Checking…':'Open Admin'}</button>{message&&<p role="alert">{message}</p>}</form></main>;
+}
