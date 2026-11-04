@@ -32,10 +32,10 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     AND (?=1 OR (status IN ('queued','retry','running') AND next_attempt_at<=?)) RETURNING attempts`).get(token,new Date(now+LEASE_MS).toISOString(),iso,id,iso,force?1:0,iso) as {attempts:number}|undefined;
   if(!job)return {message:'Settlement is already running, awaiting its next retry, or paused for review.'};
   function defer(code:string) {
-    const time=clock(),paused=job!.attempts>=MAX_ATTEMPTS;
+    const time=clock(),paused=code==='TATUM_PRICE_BOUNDARY_UNAVAILABLE' || job!.attempts>=MAX_ATTEMPTS;
     db().prepare(`UPDATE settlement_jobs SET status=?,next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error=?,updated_at=?
       WHERE prediction_id=? AND lease_token=?`).run(paused?'paused':'retry',new Date(time+Math.min(3600_000,60_000*2**(job!.attempts-1))).toISOString(),code,new Date(time).toISOString(),id,token);
-    return {message:paused?'Settlement paused after repeated failures. Check provider coverage, then retry manually.':'Evidence unavailable. A retry has been scheduled.',error:code};
+    return {message:paused?'Settlement needs manual review. Check provider coverage, then retry manually.':'Evidence unavailable. A retry has been scheduled.',error:code};
   }
   try {
     const candles=(await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))])).flat();

@@ -46,15 +46,33 @@ export function validateTatumBoundary(candle:Candle,boundary:number):Candle {
   return candle;
 }
 
-export async function priceCandle(asset:string, boundary:number):Promise<Candle> {
-  // Align up: an overlapping pre-lock candle is not admissible.
+type PriceCandleOptions = {clock?:()=>number;request?:(url:string)=>Promise<unknown>};
+export async function priceCandle(asset:string, boundary:number, {clock=Date.now,request=tatum}:PriceCandleOptions={}):Promise<Candle> {
+  // Query inside the first eligible minute, avoiding inclusive/exclusive endpoint ambiguity.
+  // An overlapping pre-lock candle remains inadmissible.
   const requested = Math.ceil(boundary/60_000)*60_000;
   const url = new URL('https://api.tatum.io/v4/data/rate/symbol/OHLCV');
-  url.search = new URLSearchParams({symbol:asset,unix:String(requested),interval:'1m'}).toString();
-  const raw = await tatum(url.toString());
+  url.search = new URLSearchParams({symbol:asset,unix:String(requested+1),interval:'1m'}).toString();
+  const raw = await request(url.toString());
   // Tatum's live 1m response uses an inclusive final millisecond (duration 59,999).
   // Normalize only this exact convention and retain the raw boundary for audits.
-  return validateTatumBoundary(normalizeTatumCandle(raw),boundary);
+  const candle=normalizeTatumCandle(raw);
+  try {
+    validateTatumBoundary(candle,boundary);
+    if (candle.closeTime>clock()) throw new ProviderError('TATUM_CANDLE_NOT_YET_AVAILABLE');
+    return candle;
+  } catch (error) {
+    if (!(error instanceof ProviderError)) throw error;
+    // Log only public timing fields. Provider payloads and request headers stay private.
+    console.warn('Tatum candle boundary rejected',{
+      asset,unix:requested+1,boundary,openTime:candle.openTime,closeTime:candle.sourceCloseTime
+    });
+    if (error.code==='TATUM_CANDLE_NOT_YET_AVAILABLE' ||
+        (candle.openTime<requested && clock()<requested+180_000)) {
+      throw new ProviderError('TATUM_CANDLE_NOT_YET_AVAILABLE');
+    }
+    throw error;
+  }
 }
 export async function assetCandles(asset:string,boundary:number):Promise<Candle[]> {
   const token=parseGmgnAssetId(asset);

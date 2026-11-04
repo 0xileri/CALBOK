@@ -1,0 +1,8 @@
+{
+  "recordedAt": "2026-11-04",
+  "provider": "Tatum /v4/data/rate/symbol/OHLCV",
+  "entryUnix": 1793710740000,
+  "exitUnix": 1793797140000,
+  "entryResponse": {"symbol":"BTC","openTime":1793284140000,"open":"80346.51000000","high":"80427.21000000","low":"80346.51000000","close":"80427.21000000","volume":"8.77140000","closeTime":1793284199999,"quoteAssetVolume":"705109.72043330","numberOfTrades":2606,"takerBuyBaseAssetVolume":"7.15448000","takerBuyQuoteAssetVolume":"575120.67168990"},
+  "exitResponse": {"symbol":"BTC","openTime":1793284140000,"open":"80346.51000000","high":"80427.21000000","low":"80346.51000000","close":"80427.21000000","volume":"8.77140000","closeTime":1793284199999,"quoteAssetVolume":"705109.72043330","numberOfTrades":2606,"takerBuyBaseAssetVolume":"7.15448000","takerBuyQuoteAssetVolume":"575120.67168990"}
+}

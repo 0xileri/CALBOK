@@ -35,6 +35,19 @@ test('durable worker: deadlines, overlapping checks, retries, pause, and lease r
     assert.equal(promotedReceipt.inbox_id,logged.id);
     assert.equal(Date.parse(promotedReceipt.deadline)-Date.parse(promotedReceipt.locked_at),86_400_000);
 
+    const mismatched=due();
+    await runSettlement(mismatched.id,{clock,fetchCandles:async()=>{throw new ProviderError('TATUM_PRICE_BOUNDARY_UNAVAILABLE');}});
+    assert.equal(db().prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(mismatched.id)?.status,'paused');
+    const recent=due();
+    await runSettlement(recent.id,{clock,fetchCandles:async()=>{throw new ProviderError('TATUM_CANDLE_NOT_YET_AVAILABLE');}});
+    assert.equal(db().prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(recent.id)?.status,'retry');
+    db().prepare("UPDATE settlement_jobs SET status='paused' WHERE prediction_id=?").run(recent.id);
+    const recoveredEntry=due();
+    const boundaries:number[]=[];
+    await runSettlement(recoveredEntry.id,{clock,fetchCandles:async(asset,boundary)=>{boundaries.push(boundary);return prices(asset,boundary);}});
+    assert.deepEqual(boundaries.sort((a,b)=>a-b),[recoveredEntry.locked,recoveredEntry.deadline]);
+    assert.equal(db().prepare('SELECT outcome FROM settlements WHERE prediction_id=?').get(recoveredEntry.id)?.outcome,'won');
+
     const first=due();
     let release!:()=>void;
     const gate=new Promise<void>(resolve=>{release=resolve;});
