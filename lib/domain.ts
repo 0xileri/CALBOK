@@ -1,3 +1,4 @@
+import {safeSourceUrl} from './source-links';
 import {horizons} from './horizons';
 import Decimal from 'decimal.js';
 import { z } from 'zod';
@@ -10,7 +11,7 @@ export const claimSchema = z.object({
   direction: z.enum(['bullish', 'bearish']),
   horizon: z.enum(horizons),
   // This release supports prospectively self-logged directional calls only.
-  sourceUrl: z.union([z.literal(''), z.url().refine(v => new URL(v).protocol === 'https:', 'Use an HTTPS URL')]).default(''),
+  sourceUrl: z.union([z.literal(''), z.string().max(2048).refine(v => safeSourceUrl(v)!==null, 'Use an HTTP or HTTPS link without credentials.')]).default(''),
 });
 export type Claim = z.infer<typeof claimSchema>;
 export type Outcome = 'won' | 'lost' | 'neutral' | 'pending' | 'unscorable';

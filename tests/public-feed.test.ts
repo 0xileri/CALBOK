@@ -11,7 +11,7 @@ process.env.CALBOK_PUBLIC_ORIGIN='https://calbok.example';
 const {db,capture,listReceipts}=await import('../lib/db');
 const {saveAccountProfile,accountDetails}=await import('../lib/account-profile');
 const {publishReceipt,hidePublicReceipt,publicHandle}=await import('../lib/publication');
-const {publicFeed,publicCaller,parseFeedQuery}=await import('../lib/public-feed');
+const {publicFeed,publicCaller,parseFeedQuery,publicHomeData}=await import('../lib/public-feed');
 const {runSettlement}=await import('../lib/settlement-worker');
 const {normalizeCoinbaseCandle}=await import('../lib/coinbase-pricing');
 const {proofSchema}=await import('../lib/integration-proof-store');
@@ -35,7 +35,7 @@ const {CallReview}=await import('../components/call-review');
 const alice={id:'PRIVATE_ALICE_ID',email:'PRIVATE_ALICE@example.test',role:'user' as const};
 const bob={id:'PRIVATE_BOB_ID',email:'PRIVATE_BOB@example.test',role:'user' as const};
 const owner={id:'operator',email:null,role:'operator' as const};
-const claim={caller:'@CryptoKaleo',asset:'BTC',direction:'bullish' as const,horizon:'15m' as const,text:'PRIVATE ORIGINAL TEXT',sourceUrl:'https://example.test/PRIVATE_SOURCE'};
+const claim={caller:'@CryptoKaleo',asset:'BTC',direction:'bullish' as const,horizon:'15m' as const,text:'PRIVATE ORIGINAL TEXT',sourceUrl:'https://x.com/CryptoKaleo/status/123'};
 const query=(value='')=>parseFeedQuery(new URLSearchParams(value));
 const row=(id:string)=>listReceipts().find(r=>r.id===id)!;
 function request(token:string,body:unknown,origin='https://calbok.example'){return new Request('https://calbok.example/api/publication',{method:'POST',headers:{origin,'Content-Type':'application/json',cookie:'calbok_session='+token},body:JSON.stringify(body)});}
@@ -76,7 +76,7 @@ test('feed, caller pages and both APIs expose only published allowlisted fields,
  const base=Date.UTC(2026,8,1);let sequence=0;
  const create=(label:string,ownerId=alice.id,horizon:'15m'|'1h'='15m',visibility:'public'|'private'='public')=>{
   t.mock.timers.enable({apis:['Date'],now:base+sequence++*60000});
-  try{return capture({...claim,text:'PRIVATE TEXT '+label,horizon},ownerId,undefined,undefined,undefined,false,undefined,visibility);}finally{t.mock.timers.reset();}
+  try{return capture({...claim,text:'PRIVATE TEXT '+label,horizon,sourceUrl:visibility==='private'?'https://example.test/PRIVATE_SOURCE':claim.sourceUrl},ownerId,undefined,undefined,undefined,false,undefined,visibility);}finally{t.mock.timers.reset();}
  };
  const settle=async(id:string,end:number)=>runSettlement(id,{clock:()=>Date.parse(row(id).deadline)+120000,fetchCandles:async(_asset,boundary)=>[normalizeCoinbaseCandle('BTC',[Math.ceil(boundary/60000)*60,80,120,boundary===Date.parse(row(id).locked_at)?100:end,100,1])]});
  const won=create('won');await settle(won,110);
@@ -104,7 +104,7 @@ test('feed, caller pages and both APIs expose only published allowlisted fields,
  assert.equal(apiFeed.status,200);assert.equal(apiCaller.status,200);
  const ticker=await tickerApi(new Request('https://calbok.example/api/public-feed?limit=24'));
  assert.equal(ticker.status,200);assert.match(ticker.headers.get('cache-control')||'',/max-age=45/);
- const tickerData=await ticker.json();assert.equal(tickerData.calls.length,5);
+ const tickerData=await ticker.json();assert.equal(tickerData.calls.length,5);assert.deepEqual(tickerData.stats,{logged:5,settled:3,memories:1});assert.equal(publicHomeData(1).calls.length,1);assert.deepEqual(publicHomeData(1).stats,tickerData.stats);
  assert.equal((await tickerApi(new Request('https://calbok.example/api/public-feed?limit=1'))).status,200);
  for(const badLimit of ['0','25','NaN'])assert.equal((await tickerApi(new Request('https://calbok.example/api/public-feed?limit='+badLimit))).status,400);
  const individual=await callApi(new Request('https://calbok.example/api/public-calls/'+won),{params:Promise.resolve({id:won})});assert.equal(individual.status,200);
@@ -117,8 +117,8 @@ test('feed, caller pages and both APIs expose only published allowlisted fields,
  assert.match(tickerHtml,/ticker-copy" aria-hidden="true"/);assert.match(tickerHtml,/tabindex="-1"/);
  assert.match(callHtml,/<summary>Proof details<\/summary>/);assert.ok(!/<details[^>]*\sopen[\s>]/.test(callHtml));assert.match(tickerHtml,/aria-pressed="true"/);assert.match(tickerHtml,/is-paused/);
  for(const output of [serialized,feedHtml,callerHtml,callHtml,tickerHtml])for(const privateValue of [alice.id,bob.id,alice.email,bob.email,'PRIVATE_JOB_ID','PRIVATE_NAMESPACE','PRIVATE_SOURCE','PRIVATE_NOTE','PRIVATE_RAW_MEMORY','PRIVATE_INBOX_TEXT','PRIVATE_INBOX_CALLER','PRIVATE TEXT','PRIVATE_ERROR',privateLost,process.env.CALBOK_ADMIN_TOKEN!])assert.ok(!output.includes(privateValue),privateValue+' leaked');
- assert.match(feedHtml,/self-logged before outcome/);assert.match(callerHtml,/50.0%/);assert.match(feedHtml,/alice_public/);
- assert.ok(!('text' in feed.calls[0]));assert.ok(!('source_url' in feed.calls[0]));
+ assert.match(callHtml,/View original post/);assert.match(callHtml,/x.com\/CryptoKaleo/);assert.match(feedHtml,/rel="noopener noreferrer nofollow"/);assert.match(feedHtml,/target="_blank"/);assert.match(feedHtml,/self-logged before outcome/);assert.match(callerHtml,/50.0%/);assert.match(feedHtml,/alice_public/);
+ assert.ok(!('text' in feed.calls[0]));assert.equal(feed.calls[0].source_url,claim.sourceUrl);
  assert.equal(db().prepare('SELECT COUNT(*) n FROM memory_jobs').get()?.n,beforeJobs);
  for(const path of ['page=0','pageSize=51','horizon=soon','outcome=invented','caller=email%40example.test'])assert.equal((await feedApi(new Request('https://calbok.example/api/feed?'+path))).status,400);
  assert.equal((await callerApi(new Request('https://calbok.example/api/caller/missing'),{params:Promise.resolve({handle:'missing'})})).status,404);

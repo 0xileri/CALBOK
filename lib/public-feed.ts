@@ -7,6 +7,7 @@ import {proofSchema} from './integration-proof-store';
 import {scheduledRepeat} from './scheduled-repeat';
 import type {MemoryJob} from './memory-ledger';
 import {horizons} from './horizons';
+import {safeSourceUrl} from './source-links';
 
 export const canonicalCaller=(value:string)=>value.trim().replace(/^@/,'').toLowerCase();
 export const callerPath=(value:string)=>'/caller/'+encodeURIComponent(canonicalCaller(value));
@@ -31,18 +32,22 @@ function publicRows(){
     &&!!row.snapshot&&hash(row.snapshot)===row.snapshot_hash&&Date.parse(row.deadline)>Date.parse(row.locked_at))
     .map(row=>({receipt:row,loggedBy:handles.get(row.id)!}));
 }
-/** No raw SQL rows or snapshots leave this module. Completion uses the same proof validation as /proof. */
-function projectRows(rows:ReturnType<typeof publicRows>){
+function memoryCompletions(receipts:ReturnType<typeof listReceipts>){
   proofSchema();
-  const receipts=rows.map(row=>row.receipt),ids=new Set(receipts.map(row=>row.id));
+  const ids=new Set(receipts.map(row=>row.id));
   const jobs=(db().prepare('SELECT * FROM memory_jobs').all() as MemoryJob[]).filter(row=>ids.has(row.prediction_id));
   const proofs=(db().prepare('SELECT * FROM memory_completion_proofs').all() as CompletionProof[]).filter(row=>ids.has(row.prediction_id));
-  const completed=completedMemoryProofs(receipts,jobs,proofs);
+  return completedMemoryProofs(receipts,jobs,proofs);
+}
+/** No raw SQL rows or snapshots leave this module. Completion uses the existing proof validation. */
+function projectRows(rows:ReturnType<typeof publicRows>){
+  const completed=memoryCompletions(rows.map(row=>row.receipt));
   return rows.map(({receipt:row,loggedBy})=>{
     const outcome=profileOutcome(row),verified=['won','lost','neutral'].includes(outcome);
     // profileOutcome has validated the evidence before any settlement field is exposed.
     const evidence=verified?JSON.parse(row.evidence!) as {returnPct:string;provider:string;entry:{provider?:string;hash:string};exit:{provider?:string;hash:string}}:null;
     return {id:row.id,caller:row.caller,loggedBy,asset:row.asset,direction:row.direction,horizon:row.horizon,
+      source_url:safeSourceUrl(row.source_url)||'',
       assetSymbol:row.asset_symbol&&/^[a-zA-Z0-9$._-]{1,24}$/.test(row.asset_symbol)?row.asset_symbol:null,
       locked_at:row.locked_at,deadline:row.deadline,outcome,
       returnPct:evidence?.returnPct??null,provider:evidence?.provider??null,
@@ -63,6 +68,11 @@ function paginate(rows:ReturnType<typeof publicRows>,query:FeedQuery){
   return {calls:projectRows(rows.slice(start,start+query.pageSize)),page:query.page,pageSize:query.pageSize,total:rows.length,hasMore:start+query.pageSize<rows.length};
 }
 export function publicFeed(query:FeedQuery){return paginate(filteredRows(query),query);}
+export function publicHomeData(limit=24){
+ const rows=publicRows().sort((a,b)=>b.receipt.locked_at.localeCompare(a.receipt.locked_at)||b.receipt.id.localeCompare(a.receipt.id));
+ const receipts=rows.map(row=>row.receipt);
+ return {calls:projectRows(rows.slice(0,Math.min(24,Math.max(1,limit)))),stats:{logged:rows.length,settled:receipts.filter(row=>['won','lost','neutral'].includes(profileOutcome(row))).length,memories:memoryCompletions(receipts).length},asOf:Date.now()};
+}
 export function publicCallById(id:string){const row=publicRows().find(row=>row.receipt.id===id);return row?projectRows([row])[0]:null;}
 export function publicCaller(handle:string,query:FeedQuery){
   if(!publicCallerAllowed(handle)||handle.length>60)return null;
@@ -77,3 +87,4 @@ export function publicCaller(handle:string,query:FeedQuery){
 export type PublicCall=ReturnType<typeof projectRows>[number];
 export type PublicFeed=ReturnType<typeof publicFeed>;
 export type PublicCaller=NonNullable<ReturnType<typeof publicCaller>>;
+export type PublicHomeData=ReturnType<typeof publicHomeData>;

@@ -49,7 +49,7 @@ test('owner series uses the normal durable flow, bounded approvals, labels and f
  const advance=(ms=1000)=>at(clock+ms);
  async function settle(id:string,win=true){at(Date.parse(receipt(id).deadline)+120000);assert.equal((await runSettlement(id,{fetchCandles:prices(id,win)})).result?.outcome,win?'won':'lost');}
  async function remember(id:string,automatic=false){const result=await rememberReceipt(receipt(id),'operator',automatic,client);if(result.status===202){advance();assert.equal((await rememberReceipt(receipt(id),'operator',automatic,client)).status,200);}else assert.equal(result.status,200);}
- async function seed(label:string,horizon:'15m'|'1h'|'4h'|'24h'='1h',win=true){advance(2*3600000);const id=capture({caller:'TEST '+label,asset:'BTC',direction:'bullish',horizon,text:'SYNTHETIC SERIES TEST '+label+' '+randomUUID(),sourceUrl:''});await settle(id,win);await remember(id);advance();return id;}
+ async function seed(label:string,horizon:'15m'|'1h'|'4h'|'24h'='1h',win=true){advance(2*3600000);const id=capture({caller:'TEST '+label,asset:'BTC',direction:'bullish',horizon,text:'SYNTHETIC SERIES TEST '+label+' '+randomUUID(),sourceUrl:'https://example.test/series-source'});await settle(id,win);await remember(id);advance();return id;}
  async function newSeries(label:string,count=2){const id=await seed(label);const seriesId=start(id,count);advance();await repeatSeriesTick(recall);return seriesId;}
  try{
   at(clock);setAutomaticMemory(true);
@@ -75,7 +75,7 @@ test('owner series uses the normal durable flow, bounded approvals, labels and f
    const id=await seed('count');const seriesId=start(id,2),original=receipt(id).snapshot_hash,regularLimit=automaticMemoryStatus().limit;
    advance();const lockedAt=clock;
    await workerTick({fetchCandles:prices(id),runSeries:()=>repeatSeriesTick(recall)});
-   const first=currentStep(seriesId);assert.equal(Date.parse(first.locked_at),lockedAt);assert.equal(Date.parse(first.deadline)-lockedAt,3600000);assert.equal(receipt(id).snapshot_hash,original);
+   const first=currentStep(seriesId);assert.equal(first.source_url,receipt(id).source_url,'Scheduled repeats retain the original source');assert.equal(Date.parse(first.locked_at),lockedAt);assert.equal(Date.parse(first.deadline)-lockedAt,3600000);assert.equal(receipt(id).snapshot_hash,original);
    assert.equal(seriesForReceipt(first.id)?.id,seriesId);assert.equal(scheduledRepeat(first)?.step,1);assert.match(JSON.stringify(journalExport([first])),/owner_scheduled_repeat|scheduled repeat by owner/);assert.match(journalCsv([first]),/scheduled repeat by owner/);assert.match(scheduledRepeatLabel(first)!,new RegExp(seriesId));assert.match(receiptSummary(first),/scheduled repeat by owner/);
    await Promise.all([repeatSeriesTick(recall),repeatSeriesTick(recall)]);assert.equal(current(seriesId).created_count,1);
    await settle(first.id);await repeatSeriesTick(recall);assert.equal(current(seriesId).created_count,1);

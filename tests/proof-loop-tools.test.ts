@@ -26,7 +26,7 @@ test('15m/1h/4h lock, settle, remember and cited repeat work for Tatum, Coinbase
    const horizon=hours===0.25?'15m':hours===1?'1h':'4h',caller='TEST '+source+' '+horizon,asset=source==='GMGN'?token.id:'BTC';
    const locked=now-hours*3600000-120000;
    t.mock.timers.enable({apis:['Date'],now:locked});
-   const id=capture({caller,text:'SYNTHETIC SHORT HORIZON TEST '+source+horizon,asset,direction:'bullish',horizon,sourceUrl:''});t.mock.timers.reset();
+   const id=capture({caller,text:'SYNTHETIC SHORT HORIZON TEST '+source+horizon,asset,direction:'bullish',horizon,sourceUrl:'https://example.test/original-call'});t.mock.timers.reset();
    const make=(minute:number)=>{
     const open=minute===locked?'100':'110';
     if(source==='Coinbase')return normalizeCoinbaseCandle(asset,[minute/1000,90,120,Number(open),110,1]);
@@ -39,7 +39,7 @@ test('15m/1h/4h lock, settle, remember and cited repeat work for Tatum, Coinbase
    assert.equal(profileOutcome(receipt),'won');
    const factory:NonNullable<Parameters<typeof rememberReceipt>[3]>=async()=>({remember:async()=>({job_id:'test-job-'+id,status:'pending'}),waitForRememberJob:async()=>({id:'test-job-'+id,job_id:'test-job-'+id,blob_id:'test-blob-'+id,owner:'test-owner',namespace:'test'}),getRememberStatus:async()=>{throw new Error('Unexpected poll');},listMemories:async()=>{throw new Error('Unexpected list');},recall:async()=>({results:[{text:JSON.stringify({predictionId:id}),blob_id:'test-blob-'+id,distance:0}],total:1})});
    await rememberReceipt(receipt,'operator',false,factory);
-   const seed=lockAgainSeed(receipt)!;assert.equal(seed.asset.id,asset);assert.equal(seed.fields.horizon,horizon);
+   const seed=lockAgainSeed(receipt)!;assert.equal(seed.asset.id,asset);assert.equal(seed.fields.horizon,horizon);assert.equal(seed.fields.sourceUrl,receipt.source_url);
    const confirmation=Date.now()+1000;t.mock.timers.enable({apis:['Date'],now:confirmation});
    assert.throws(()=>capture(seed.fields as Parameters<typeof capture>[0],'foreign',undefined,undefined,id),/VERIFIED_PRIOR/);
    const repeated=capture(seed.fields as Parameters<typeof capture>[0],'operator',undefined,undefined,id);
@@ -47,7 +47,7 @@ test('15m/1h/4h lock, settle, remember and cited repeat work for Tatum, Coinbase
    t.mock.timers.reset();
    const later=listReceipts('operator').find(r=>r.id===repeated)!;
    assert.equal(Date.parse(later.locked_at),confirmation);assert.equal(Date.parse(later.deadline)-confirmation,hours*3600000);
-   assert.equal(later.outcome,null);assert.equal(lockAgainSeed(later),null);
+   assert.equal(later.source_url,receipt.source_url,'Lock again retains original source');assert.equal(later.outcome,null);assert.equal(lockAgainSeed(later),null);
    const review=await automaticRecall('operator',repeated,factory);
    assert.deepEqual(review?.citedIds,[id]);
    assert.ok(db().prepare('SELECT 1 FROM receipt_repeat_links WHERE prediction_id=? AND original_id=?').get(repeated,id));
