@@ -8,7 +8,7 @@ import {DatabaseSync} from 'node:sqlite';
 const directory=mkdtempSync(join(tmpdir(),'calbok-worker-test-'));
 process.env.CALBOK_DB_PATH=join(directory,'worker.sqlite');
 const {db,capture,hash,listReceipts}=await import('../lib/db');
-const {runSettlement,workerTick}=await import('../lib/settlement-worker');
+const {runSettlement,workerTick,requeueStaleSettlementJobs}=await import('../lib/settlement-worker');
 const {ProviderError}=await import('../lib/providers');
 const now=Math.floor(Date.now()/60_000)*60_000;
 const clock=()=>now;
@@ -17,10 +17,20 @@ function due() {
   db().prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,'SYNTHETIC WORKER TEST','BTC','bullish','24h','Synthetic test only','',new Date(locked).toISOString(),new Date(deadline).toISOString(),id,hash(id),'test','{}');
   return {id,locked,deadline};
 }
-const prices=async(_asset:string,boundary:number)=>[{openTime:boundary,closeTime:boundary+60_000,open:boundary<now-86400_000?'100':'110',high:'120',low:'90',close:'110',hash:'test-only'}];
+const prices=async(_asset:string,boundary:number)=>[{openTime:boundary,closeTime:boundary+60_000,open:boundary<now-86400_000?'100':'110',high:'120',low:'90',close:'110',hash:'a'.repeat(64)}];
 
 test('durable worker: deadlines, overlapping checks, retries, pause, and lease recovery',async()=>{
   try {
+    const stalePrice=due(),unrelated=due();
+    await runSettlement(stalePrice.id,{clock,fetchCandles:async()=>{throw new ProviderError('TATUM_STALE_CANDLE');}});
+    await runSettlement(unrelated.id,{clock,fetchCandles:async()=>{throw new ProviderError('UNRELATED_FAILURE');}});
+    db().prepare("UPDATE settlement_jobs SET status='paused' WHERE prediction_id=?").run(unrelated.id);
+    requeueStaleSettlementJobs(now);
+    assert.equal(db().prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(stalePrice.id)?.status,'retry');
+    assert.equal(db().prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(unrelated.id)?.status,'paused');
+    db().prepare("UPDATE settlement_jobs SET status='paused' WHERE prediction_id=?").run(stalePrice.id);
+    requeueStaleSettlementJobs(now);
+    assert.equal(db().prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(stalePrice.id)?.status,'paused','Recovery runs once, not forever');
     const future=capture({caller:'SYNTHETIC FUTURE TEST',text:'Synthetic future test only',asset:'BTC',direction:'bullish',horizon:'24h',sourceUrl:''});
     let calls=0;
     const futureResult=await runSettlement(future,{clock,fetchCandles:async()=>{calls++;return [];}});
@@ -47,6 +57,7 @@ test('durable worker: deadlines, overlapping checks, retries, pause, and lease r
     await runSettlement(recoveredEntry.id,{clock,fetchCandles:async(asset,boundary)=>{boundaries.push(boundary);return prices(asset,boundary);}});
     assert.deepEqual(boundaries.sort((a,b)=>a-b),[recoveredEntry.locked,recoveredEntry.deadline]);
     assert.equal(db().prepare('SELECT outcome FROM settlements WHERE prediction_id=?').get(recoveredEntry.id)?.outcome,'won');
+    assert.ok(db().prepare('SELECT 1 FROM automatic_memory_queue WHERE prediction_id=?').get(recoveredEntry.id),'Manual and worker settlement use the shared queue path');
 
     const first=due();
     let release!:()=>void;

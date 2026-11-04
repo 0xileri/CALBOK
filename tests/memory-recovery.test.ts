@@ -159,7 +159,7 @@ async function testReconciledRefund() {
   await reconcileMemory(receipt,fake({getRememberStatus:async id=>({job_id:id,status:'failed'})}));
   assert.equal(automaticMemoryStatus().used,budget-1);
   assert.equal(job(receipt.id)?.status,'retryable');
-  await automaticMemoryTick(submit);
+  await automaticMemoryTick(submit,()=>Date.now()+180_000);
   assert.equal(job(receipt.id)?.status,'running');
   assert.equal(automaticMemoryStatus().used,budget);
   assert.equal(keys.length,2);

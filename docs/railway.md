@@ -14,7 +14,7 @@ The loop runs once a minute, processes at most three due receipts, and requests 
 
 Job state, next retry, attempts, sanitized error codes, and a worker heartbeat are visible in Integration settings and receipt details. Status refreshes every 30 seconds while the browser is visible. The UI displays the latest 100 jobs; the worker processes the full queue. Each job has a two-minute lease; an abandoned job can be recovered after expiry. Settlement, job completion, and its audit event commit together. Manual and automatic settlement share the same lease and immutable outcome contract.
 
-Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. The owner can enable automatic Walrus Mainnet writes in Integration settings. The worker reserves at most ten automatic attempts, including eligible existing settlements, and checks accepted jobs by ID. Recall is initiated from the receipt. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
+Disabling `CALBOK_WORKER_ENABLED` stops background processing after redeployment and preserves jobs. Automatic Walrus Mainnet writes default on for the operator; an explicit saved off setting stays off. The owner can pause them in Integration settings. The worker reserves at most ten automatic attempts, including eligible existing settlements, and checks accepted jobs by ID. Recall is initiated from the receipt. This is an in-process worker for the existing long-lived Railway server, not a separately scaled queue service.
 
 ## Browser sign-in
 
@@ -33,10 +33,19 @@ To change the owner email, update `CALBOK_OWNER_EMAIL` and restart the service. 
 
 ## Walrus Mainnet
 
-Set `MEMWAL_PRIVATE_KEY`, `MEMWAL_ACCOUNT_ID`, `MEMWAL_NETWORK=mainnet` and `CALBOK_WORKER_ENABLED=true`. Enable automatic writes explicitly in Integration settings.
+Set `MEMWAL_PRIVATE_KEY`, `MEMWAL_ACCOUNT_ID`, `MEMWAL_NETWORK=mainnet` and `CALBOK_WORKER_ENABLED=true`. Automatic writes default on for the operator; the Integration settings toggle can turn them off. Existing explicit off settings are preserved.
 
 When the worker and Walrus Mainnet settings are configured, the worker checks due jobs before submitting new ones, with backoff up to 15 minutes. Polling continues for manual and automatic jobs even when automatic writes are off. An explicit connection refusal before submission releases the automatic attempt. When the provider confirms a terminal failure, the next retry uses a fresh idempotency key. Failed manual submissions require a manual retry.
 
 For an uncertain submission, open the receipt as the owner and select **Reconcile memory job**. If reconciliation finds a matching blob without a verified job ID, it puts the receipt into manual review and displays the blob ID. Verify it in Walrus, then select **Confirm and link blob**. If you confirm that the write failed, select **Mark memory job failed** to allow a manual retry. CALBOK records the decision, the owner who made it, and the time. An owner-confirmed blob link stays outside integration proof because that proof requires a verified provider job ID. A missing provider result leaves acceptance uncertain.
 
 Schema additions are additive: `prediction_owners`, `accounts`, `sessions`, `login_codes`, and `login_limits`. Existing predictions remain assigned to the operator without rewriting their immutable snapshots. The same persistent volume is required. Rotating the admin key changes owner-key login and the fallback code-hashing secret; existing sessions must be revoked explicitly if compromise is suspected.
+
+
+### Price source order
+
+For catalog assets, pricing tries Tatum, then Coinbase USD candles when Tatum is stale or has no matching boundary, then Binance public spot USDT klines when Coinbase has no symbol or eligible history. Binance evidence retains the exact pair, raw kline and SHA-256 hash. USD and USDT candles are never mixed within one settlement. Only exact spot base symbols are used; scaled `1000` pairs are not substituted. GMGN remains the exclusive source for `gmgn:` assets.
+
+Settlements (manual and worker) enqueue verified operator outcomes for memory. Worker startup and each cycle backfill the durable queue. Dispatch is limited to one new automatic submission per minute and ten budgeted writes total; extra queued receipts wait for operator action on the budget. Confirmed failed automatic submissions refund the budget and retry with exponential backoff, up to eight failures before manual review. Uncertain acceptance never resubmits automatically. Pending jobs have polling priority, even with writes off. Manual failures remain manual-only. Confirmed completion triggers automatic recall for the same owner, preserving the before-lock citation checks.
+
+Deployment `binance-fallback-v1` requeues unsettled jobs paused for `TATUM_STALE_CANDLE` or `TATUM_PRICE_BOUNDARY_UNAVAILABLE` once. Other manual-review jobs and all immutable settlements stay unchanged.

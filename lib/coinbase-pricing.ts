@@ -30,7 +30,7 @@ export async function coinbaseCandles(asset:string,boundary:number,clock=Date.no
   const url=new URL('https://api.exchange.coinbase.com/products/'+asset+'-USD/candles');
   url.search=new URLSearchParams({granularity:'60',start:new Date(requested).toISOString(),end:new Date(requested+60_000).toISOString()}).toString();
   const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000)});
-  if (!response.ok) throw new ProviderError('COINBASE_PRICE_UNAVAILABLE');
+  if (!response.ok) throw new ProviderError(response.status===404?'COINBASE_MARKET_UNSUPPORTED':'COINBASE_PRICE_UNAVAILABLE');
   const raw:unknown=await response.json();
   if (!Array.isArray(raw)) throw new ProviderError('COINBASE_PRICE_UNVERIFIED');
   const candles=raw.map(row=>normalizeCoinbaseCandle(asset,row));

@@ -19,8 +19,8 @@ test('supported horizons persist their exact deadline and queue boundary',()=>{
   }
 });
 
-test('automatic memory defaults off and skips pending calls even when enabled',async()=>{
-  assert.equal(automaticMemoryStatus().enabled,false);
+test('automatic memory defaults on and skips pending calls even when enabled',async()=>{
+  assert.equal(automaticMemoryStatus().enabled,true);
   await automaticMemoryTick();
   process.env.CALBOK_WORKER_ENABLED='true';
   process.env.MEMWAL_NETWORK='mainnet';

@@ -14,7 +14,9 @@ export function memoryHistory(owner: string) {
     return {receipts,completed};
 }
 
-export async function recallReceipt(receipt: Receipt, owner: string, getClient = memoryClient) {
+type RecallClientFactory=(namespace:string)=>Promise<Pick<Awaited<ReturnType<typeof memoryClient>>,'recall'>>;
+
+export async function recallReceipt(receipt: Receipt, owner: string, getClient:RecallClientFactory = memoryClient) {
     const {receipts,completed} = memoryHistory(owner);
     const namespace=namespaceFor(owner==='operator'?receipt.caller:JSON.stringify([owner,receipt.caller])),client=await getClient(namespace);
     const recalled=await client.recall({query:`caller=${receipt.caller}; asset=${receipt.asset}; horizon=${receipt.horizon}; direction=${receipt.direction}`,namespace,limit:20,maxDistance:0.5});
@@ -36,7 +38,7 @@ export function matchingPriorMemory(target: Receipt, prior: Receipt, completedAt
         && Date.parse(completedAt) < Date.parse(target.locked_at);
 }
 
-export async function automaticRecall(owner: string, targetId?: string, getClient = memoryClient) {
+export async function automaticRecall(owner: string, targetId?: string, getClient:RecallClientFactory = memoryClient) {
     if (!configuration().walrus || (owner !== 'operator' && process.env.CALBOK_USER_PROVIDER_ACCESS !== 'true')) return;
     const {receipts,completed} = memoryHistory(owner);
     const database = db();

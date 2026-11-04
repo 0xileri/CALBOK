@@ -1,6 +1,7 @@
+import {binanceCandles} from './binance-pricing';
 import {entryPriceTick} from './entry-price';
 import {automaticRecall} from './receipt-recall';
-import {automaticMemoryTick} from './automatic-memory';
+import {automaticMemoryTick,queueSettledMemory,backfillSettledMemories} from './automatic-memory';
 import {randomUUID} from 'node:crypto';
 import {db,hash,listReceipts} from './db';
 import {METHOD,settle,type Candle} from './domain';
@@ -38,7 +39,12 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     return {message:paused?'Settlement needs manual review. Check provider coverage, then retry manually.':'Evidence unavailable. A retry has been scheduled.',error:code};
   }
   try {
-    const candles=(await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))])).flat();
+    let pair=await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))]);
+    if(fetchCandles===assetCandles && pair[0][0]?.provider!==pair[1][0]?.provider && !parseGmgnAssetId(receipt.asset)) {
+      // Compare like quotes from one venue; never mix Coinbase USD and Binance USDT.
+      pair=await Promise.all([binanceCandles(receipt.asset,Date.parse(receipt.locked_at)),binanceCandles(receipt.asset,Date.parse(receipt.deadline))]);
+    }
+    const candles=pair.flat();
     const result=settle(receipt.direction as 'bullish'|'bearish',Date.parse(receipt.locked_at),Date.parse(receipt.deadline),candles,clock());
     if(!['won','lost','neutral'].includes(result.outcome))return defer('PRICE_COVERAGE_UNAVAILABLE');
     if ((result.entry?.provider||'Tatum') !== (result.exit?.provider||'Tatum')) return defer('PRICE_PROVIDER_MISMATCH');
@@ -53,11 +59,28 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
       database.prepare("UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=? WHERE prediction_id=? AND lease_token=?").run(completed,id,token);
       database.exec('COMMIT');
     } catch(error){database.exec('ROLLBACK');throw error;}
+    const settledReceipt=listReceipts().find(row=>row.id===id);
+    if(settledReceipt) queueSettledMemory(settledReceipt);
     return {message:result.reason,result};
   } catch(error) {
     const code=error instanceof ProviderError && /^[A-Z][A-Z0-9_]{0,80}$/.test(error.code)?error.code:'SETTLEMENT_PROVIDER_UNAVAILABLE';
     return defer(code);
   }
+}
+
+/** One deployment migration: recover only the stale Tatum failures, once, without rewriting evidence. */
+export function requeueStaleSettlementJobs(now=Date.now()) {
+  const database=db();
+  database.exec('CREATE TABLE IF NOT EXISTS settlement_recoveries (name TEXT PRIMARY KEY)');
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    const claimed=database.prepare("INSERT OR IGNORE INTO settlement_recoveries VALUES ('binance-fallback-v1')").run();
+    if(claimed.changes) database.prepare(`UPDATE settlement_jobs SET status='retry',attempts=0,next_attempt_at=?,lease_token=NULL,lease_until=NULL,updated_at=?
+      WHERE status='paused' AND last_error IN ('TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE')
+      AND NOT EXISTS(SELECT 1 FROM settlements s WHERE s.prediction_id=settlement_jobs.prediction_id)`)
+      .run(new Date(now).toISOString(),new Date(now).toISOString());
+    database.exec('COMMIT');
+  } catch(error) {database.exec('ROLLBACK');throw error;}
 }
 
 export function settlementStatus() {
@@ -74,7 +97,9 @@ export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Opti
     WHERE id=1 AND (lease_until IS NULL OR lease_until<=?) AND next_tick_at<=? RETURNING id`).get(owner,new Date(now+LEASE_MS).toISOString(),new Date(now+60_000).toISOString(),iso,iso,iso);
   if(!leader)return;
   try {
+    requeueStaleSettlementJobs(now);
     syncSettlementJobs(now);
+    backfillSettledMemories();
     const due=database.prepare(`SELECT j.prediction_id FROM settlement_jobs j JOIN predictions p ON p.id=j.prediction_id
       LEFT JOIN settlements s ON s.prediction_id=p.id WHERE s.prediction_id IS NULL AND j.status IN ('queued','retry','running')
       AND j.next_attempt_at<=? AND (j.lease_until IS NULL OR j.lease_until<=?)

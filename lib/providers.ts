@@ -1,3 +1,4 @@
+import {binanceCandles} from './binance-pricing';
 import {coinbaseCandles} from './coinbase-pricing';
 import { z } from 'zod';
 import { hash } from './db';
@@ -57,6 +58,7 @@ export async function priceCandle(asset:string, boundary:number, {clock=Date.now
   const raw = await request(url.toString());
   // Tatum's live 1m response uses an inclusive final millisecond (duration 59,999).
   // Normalize only this exact convention and retain the raw boundary for audits.
+  if(raw===null) throw new ProviderError(clock()<requested+180_000?'TATUM_CANDLE_NOT_YET_AVAILABLE':'TATUM_PRICE_BOUNDARY_UNAVAILABLE');
   const candle=normalizeTatumCandle(raw);
   try {
     if (Math.abs(candle.openTime-requested)>120_000) throw new ProviderError('TATUM_STALE_CANDLE');
@@ -81,9 +83,12 @@ export async function assetCandles(asset:string,boundary:number):Promise<Candle[
   if (token) return gmgnCandles(token.chain,token.address,boundary);
   try {return [await priceCandle(asset,boundary)];}
   catch (error) {
-    if (!(error instanceof ProviderError) || !['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE'].includes(error.code)) throw error;
+    if (!(error instanceof ProviderError) || !['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_HTTP_404'].includes(error.code)) throw error;
     try {return await coinbaseCandles(asset,boundary);}
-    catch {throw error;}
+    catch (fallbackError) {
+      if (!(fallbackError instanceof ProviderError) || !['COINBASE_MARKET_UNSUPPORTED','COINBASE_BOUNDARY_UNAVAILABLE'].includes(fallbackError.code)) throw fallbackError;
+      try {return await binanceCandles(asset,boundary);} catch {throw error;}
+    }
   }
 }
 export async function memoryClient(namespace:string) {
