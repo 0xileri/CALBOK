@@ -1,3 +1,4 @@
+import type {ScheduledRepeat} from './scheduled-repeat';
 import {lockAgainSeed} from './lock-again';
 import {horizonHours} from './horizons';
 import { DatabaseSync } from 'node:sqlite';
@@ -47,6 +48,16 @@ export function db() {
     CREATE TRIGGER IF NOT EXISTS keep_prediction_owner BEFORE DELETE ON prediction_owners BEGIN SELECT RAISE(ABORT,'Receipt ownership is immutable'); END;`);
   instance.exec('CREATE TABLE IF NOT EXISTS receipt_inbox_links (prediction_id TEXT PRIMARY KEY REFERENCES predictions(id), inbox_id TEXT NOT NULL REFERENCES call_inbox(id))');
   if(!instance.prepare("SELECT 1 FROM pragma_table_info('settlement_jobs') WHERE name='first_checked_at'").get())instance.exec('ALTER TABLE settlement_jobs ADD COLUMN first_checked_at TEXT');
+  instance.exec(`CREATE TABLE IF NOT EXISTS repeat_series (
+    id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,request_id TEXT NOT NULL,group_key TEXT NOT NULL,
+    seed_id TEXT NOT NULL REFERENCES predictions(id),current_id TEXT NOT NULL REFERENCES predictions(id),
+    target_count INTEGER NOT NULL CHECK(target_count BETWEEN 1 AND 10),created_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',stop_reason TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+    UNIQUE(owner_id,request_id));
+    CREATE UNIQUE INDEX IF NOT EXISTS repeat_series_active_group ON repeat_series(owner_id,group_key) WHERE status='active';
+    CREATE TABLE IF NOT EXISTS repeat_series_steps (
+      series_id TEXT NOT NULL REFERENCES repeat_series(id),step INTEGER NOT NULL,prediction_id TEXT NOT NULL UNIQUE REFERENCES predictions(id),
+      recall_state TEXT NOT NULL DEFAULT 'pending',recall_started_at TEXT,PRIMARY KEY(series_id,step));`);
   return instance;
 }
 export type Receipt = {inbox_id?:string|null;snapshot?:string;id:string;caller:string;asset:string;asset_symbol:string|null;asset_provider:string|null;direction:string;horizon:string;text:string;source_url:string;locked_at:string;deadline:string;snapshot_hash:string;provenance:string;outcome:string|null;evidence:string|null;method:string|null};
@@ -55,7 +66,7 @@ export function listReceipts(ownerId?:string):Receipt[] { return db().prepare("S
 export function ownerOf(id:string){return (db().prepare('SELECT owner_id FROM prediction_owners WHERE prediction_id=?').get(id) as {owner_id:string}|undefined)?.owner_id||'operator';}
 export function registerAsset(asset:Asset){db().prepare('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?)').run(asset.id,asset.symbol,asset.name,asset.provider,asset.chain||null,asset.address||null,asset.discoveredAt||new Date().toISOString());}
 export function knownAsset(id:string):Asset|null{const row=db().prepare('SELECT * FROM assets WHERE id=?').get(id) as Record<string,string>|undefined;return row?{id:row.id,symbol:row.symbol,name:row.name,provider:row.provider as Asset['provider'],chain:row.chain,address:row.address}:null;}
-export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string,sameGroup=false) {
+export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inboxId?:string,repeatOf?:string,sameGroup=false,scheduled?:ScheduledRepeat) {
   if(sameGroup&&!repeatOf)throw new Error('PRIOR_RECEIPT_REQUIRED');
   if(repeatOf){
     const prior=listReceipts(ownerId).find(row=>row.id===repeatOf);
@@ -70,12 +81,24 @@ export function capture(claim:Claim,ownerId='operator',draftVersion?:number,inbo
   if(parseGmgnAssetId(claim.asset)&&!assetMetadata)throw new Error('GMGN token must be discovered and selected first');
   const now = new Date(), id = `CB-${randomUUID()}`;
   const deadline = new Date(now.getTime()+horizonHours[claim.horizon]*3600_000).toISOString();
-  const snapshot = JSON.stringify({...claim,id,lockedAt:now.toISOString(),deadline,method:'directional-open-v1',...(repeatOf?{repeatedFrom:repeatOf}:{}),...(assetMetadata?{assetMetadata}:{})});
-  const fingerprint = hash(JSON.stringify([...(ownerId==='operator'?[]:[ownerId]),claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon,...(repeatOf?['repeat',repeatOf]:[])]));
+  const snapshot = JSON.stringify({...claim,id,lockedAt:now.toISOString(),deadline,method:'directional-open-v1',...(repeatOf?{repeatedFrom:repeatOf}:{}),...(scheduled?{scheduledRepeat:scheduled,sourceKind:'owner_scheduled_repeat'}:{}),...(assetMetadata?{assetMetadata}:{})});
+  const fingerprint = hash(JSON.stringify([...(ownerId==='operator'?[]:[ownerId]),claim.caller.toLowerCase(),claim.text.toLowerCase(),claim.asset,claim.direction,claim.horizon,...(repeatOf?['repeat',repeatOf]:[]),...(scheduled?['series',scheduled.seriesId,scheduled.step]:[])]));
   const database = db(); database.exec('BEGIN IMMEDIATE');
   try {
+    if(scheduled){
+      const series=database.prepare("SELECT * FROM repeat_series WHERE id=? AND owner_id=? AND status='active' AND current_id=? AND created_count=? AND target_count=?").get(scheduled.seriesId,ownerId,repeatOf||'',scheduled.step-1,scheduled.count);
+      if(!sameGroup||!series||scheduled.scheduledBy!=='operator'||scheduled.step>scheduled.count)throw new Error('SERIES_CHANGED');
+      const completed=database.prepare(`SELECT 1 FROM memory_jobs m JOIN memory_completion_proofs c USING(prediction_id)
+        WHERE m.prediction_id=? AND m.status='done' AND m.job_id=c.job_id AND m.blob_id=c.blob_id AND c.network='mainnet' AND c.completed_at<?`).get(repeatOf!,now.toISOString());
+      if(!completed)throw new Error('SERIES_MEMORY_NOT_READY');
+    }
     if (inboxId && !database.prepare('SELECT 1 FROM call_inbox WHERE id=? AND owner_id=?').get(inboxId,ownerId)) throw new Error('INBOX_NOT_FOUND');
     database.prepare('INSERT INTO predictions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,claim.caller,claim.asset,claim.direction,claim.horizon,claim.text,claim.sourceUrl,now.toISOString(),deadline,fingerprint,hash(snapshot),'self_logged_before_outcome',snapshot);
+    if(scheduled){
+      database.prepare('INSERT INTO repeat_series_steps(series_id,step,prediction_id) VALUES (?,?,?)').run(scheduled.seriesId,scheduled.step,id);
+      database.prepare('UPDATE repeat_series SET current_id=?,created_count=?,updated_at=? WHERE id=?').run(id,scheduled.step,now.toISOString(),scheduled.seriesId);
+      database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'owner_scheduled_repeat_locked',hash(snapshot),now.toISOString());
+    }
     if(repeatOf)database.prepare('INSERT INTO receipt_repeat_links VALUES (?,?)').run(id,repeatOf);
     if (inboxId) database.prepare('INSERT INTO receipt_inbox_links VALUES (?,?)').run(id,inboxId);
     database.prepare('INSERT INTO prediction_owners VALUES (?,?)').run(id,ownerId);

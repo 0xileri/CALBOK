@@ -1,3 +1,4 @@
+import {stopSeriesForReceipt} from './repeat-series-store';
 import {db,listReceipts} from './db';
 import {boundaryCandle,type Candle} from './domain';
 import {assetCandles,ProviderError} from './providers';
@@ -29,6 +30,7 @@ export async function recordEntryPrice(id:string, fetchCandles=assetCandles, clo
   } catch (failure) {
     error=failure instanceof ProviderError?failure.code:'ENTRY_PRICE_PROVIDER_UNAVAILABLE';
   }
+  if(error&&error!=='TATUM_CANDLE_NOT_YET_AVAILABLE')stopSeriesForReceipt(id,'ENTRY_PRICE_FAILURE');
   database.prepare(`INSERT INTO entry_prices VALUES (?,?,?,?)
     ON CONFLICT(prediction_id) DO UPDATE SET candle=excluded.candle,error=excluded.error,checked_at=excluded.checked_at
     WHERE entry_prices.candle IS NULL`).run(id,candle?JSON.stringify(candle):null,error,new Date(now).toISOString());

@@ -1,3 +1,4 @@
+import {stopSeriesForReceipt} from './repeat-series-store';
 import type {SqlRecallCitation,RecallReview} from './recall-types';
 import {db,listReceipts,type Receipt} from './db';
 import {completedMemoryProofs,recallComparison,type CompletionProof} from './integration-proof';
@@ -17,7 +18,7 @@ export function memoryHistory(owner: string) {
 
 type RecallClientFactory=(namespace:string)=>Promise<Pick<Awaited<ReturnType<typeof memoryClient>>,'recall'>>;
 
-export const RECALL_SQL=`SELECT p.id AS receiptId,m.job_id AS jobId,m.blob_id AS blobId,c.completed_at AS completedAt
+export const RECALL_SQL=`SELECT p.id AS receiptId,m.job_id AS jobId,m.blob_id AS blobId,c.completed_at AS completedAt,CASE WHEN json_valid(p.snapshot) THEN json_extract(p.snapshot,'$.scheduledRepeat.seriesId') END AS seriesId
 FROM predictions p
 LEFT JOIN prediction_owners o ON o.prediction_id=p.id
 JOIN settlements s ON s.prediction_id=p.id
@@ -49,8 +50,10 @@ export function verifiedRecallReview(receipt:Receipt,owner:string,saved:unknown,
 }
 
 export async function recallReceipt(receipt: Receipt, owner: string, getClient:RecallClientFactory = memoryClient) {
-    const namespace=namespaceFor(owner==='operator'?receipt.caller:JSON.stringify([owner,receipt.caller])),client=await getClient(namespace);
-    const recalled=await client.recall({query:`caller=${receipt.caller}; asset=${receipt.asset}; horizon=${receipt.horizon}; direction=${receipt.direction}`,namespace,limit:20,maxDistance:0.5});
+    const namespace=namespaceFor(owner==='operator'?receipt.caller:JSON.stringify([owner,receipt.caller]));
+    let recalled;
+    try{const client=await getClient(namespace);recalled=await client.recall({query:`caller=${receipt.caller}; asset=${receipt.asset}; horizon=${receipt.horizon}; direction=${receipt.direction}`,namespace,limit:20,maxDistance:0.5});}
+    catch(error){stopSeriesForReceipt(receipt.id,'RECALL_FAILED');throw error;}
 
     const {receipts,completed} = memoryHistory(owner);
     const retrievedIds = recalled.results.flatMap(match=>{
@@ -63,6 +66,7 @@ export async function recallReceipt(receipt: Receipt, owner: string, getClient:R
     const sql=sqlCitation(receipt,owner,comparison.citedIds);
     const review:RecallReview={...recallComparison(receipt,receipts,completed,sql.rows.map(row=>row.receiptId)),sqlCitation:sql};
     recordRecall(receipt.id,owner,{...review,retrievedIds:[...new Set(retrievedIds)]});
+    if(review.priority==='caution')stopSeriesForReceipt(receipt.id,'CAUTION_TRIGGERED');
     return review;
 }
 

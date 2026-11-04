@@ -59,3 +59,12 @@ The ledger lists provider jobs, while the durable automatic queue includes recei
 **Lock again** copies a verified settled receipt into a review form. Confirmation creates a new linked receipt at server time and uses the normal settlement, memory and recall flow. It does not backdate the call or rewrite the original. Identical requests repeating the same original receipt are deduplicated. Repeating a historical prediction is a new prospective statement, not independent evidence that its author made another post.
 
 Settings checks the four email variable names without returning their values. **Send owner sign-in test** sends through the normal one-time-code delivery path and normal login rate limits. Provider acceptance proves Resend accepted the request; inbox delivery and completing the sign-in still need to be confirmed by the owner. Public sign-in and member provider access remain disabled.
+
+
+### Owner repeat series
+
+The owner can explicitly confirm 1–10 additional scheduled locks from a verified settled 1h/4h receipt with a confirmed Mainnet memory proof. No series starts by default. Series confirmation approves memory submissions only for generated step IDs and does not increase `automatic_memory_budget`. Scheduled attempts are tracked separately from the general budget; both use the existing reservation, idempotency, submission-rate and polling paths. Keep automatic memory enabled. Pausing it stops future series locks.
+
+`repeat_series` and `repeat_series_steps` persist owner confirmation, count, current receipt and recall state on the existing volume. A step association and progress update commit with the normal immutable receipt capture. The worker creates at most one new scheduled lock per invocation, only after the previous step's verified settlement and memory completion. Count completion, caution, an owner Stop, or a failed/uncertain provider operation prevents future locks. Already locked calls remain valid and can finish previously approved memory writes; failed scheduled submissions require manual review and are not automatically resubmitted. Uncertain recall after an interrupted process stops conservatively if no saved review can be recovered within three minutes.
+
+Receipts, exports and memory payloads disclose `scheduled repeat by owner, series <id>`. These are owner-scheduled predictions, not new posts from the referenced caller. Follow [the demo runbook](demo-runbook.md#owner-opt-in-repeat-series-scheduled-predictions-not-caller-posts) when presenting them.

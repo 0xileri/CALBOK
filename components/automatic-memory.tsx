@@ -37,7 +37,7 @@ export function AutomaticMemory() {
     <p>{settings.enabled?'Enabled':'Off'} · {settings.used} of {settings.limit} automatic write attempts used.</p>
     <p>{settings.queued} verified settled receipts waiting for submission. {settings.budgetBlocked?'The write budget is full. Use Remember all settled to approve the current backlog.':''}</p>
     <p>Enabling authorizes up to {settings.limit-settings.used} more Walrus Mainnet write attempts, including existing verified outcomes. Writes can spend from your Walrus account. Pausing takes effect before the next job starts.</p>
-    <button className="button secondary" disabled={busy||(!settings.enabled&&(!settings.available||settings.used>=settings.limit))} onClick={()=>void toggle()}>{settings.enabled?'Pause auto-remember':'Enable auto-remember'}</button>
+    <button className="button secondary" disabled={busy||(!settings.enabled&&(!settings.available))} onClick={()=>void toggle()}>{settings.enabled?'Pause auto-remember':'Enable auto-remember'}</button>
     <p>Remember all settled approves the current verified backlog and enables its worker queue. It can spend from your Walrus account; new submissions remain limited to one per minute.</p>
     <button className="button secondary" disabled={busy||!settings.available||settings.queued===0} onClick={()=>void toggle(true)}>Remember all settled</button>
     {error&&<p role="alert">{error}</p>}

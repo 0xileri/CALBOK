@@ -1,3 +1,5 @@
+import {repeatSeriesTick} from './repeat-series';
+import {stopSeriesForReceipt} from './repeat-series-store';
 import {exitCandleFinalizedAt} from './settlement-timing';
 import {coinbaseCandles} from './coinbase-pricing';
 import {binanceCandles} from './binance-pricing';
@@ -12,7 +14,7 @@ import {parseGmgnAssetId} from './assets';
 
 const LEASE_MS=120_000,MAX_ATTEMPTS=8;
 export type SettlementJob={prediction_id:string;status:string;attempts:number;next_attempt_at:string;lease_until:string|null;last_error:string|null;updated_at:string;first_checked_at:string|null};
-type Options={force?:boolean;clock?:()=>number;fetchCandles?:(asset:string,boundary:number)=>Promise<Candle[]>};
+type Options={runSeries?:()=>Promise<void>;force?:boolean;clock?:()=>number;fetchCandles?:(asset:string,boundary:number)=>Promise<Candle[]>};
 export function syncSettlementJobs(now=Date.now()) {
   db().prepare(`INSERT OR IGNORE INTO settlement_jobs(prediction_id,next_attempt_at,updated_at)
     SELECT p.id,p.deadline,? FROM predictions p
@@ -43,6 +45,7 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     AND (?=1 OR (status IN ('queued','retry','running') AND next_attempt_at<=?)) RETURNING attempts`).get(iso,token,new Date(now+LEASE_MS).toISOString(),iso,id,iso,force?1:0,iso) as {attempts:number}|undefined;
   if(!job)return {message:'Settlement is already running, awaiting its next retry, or paused for review.'};
   function defer(code:string) {
+    if(code!=='TATUM_CANDLE_NOT_YET_AVAILABLE')stopSeriesForReceipt(id,'PRICE_PROVIDER_FAILURE');
     const time=clock(),paused=['TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_STALE_CANDLE'].includes(code) || job!.attempts>=MAX_ATTEMPTS;
     db().prepare(`UPDATE settlement_jobs SET status=?,next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error=?,updated_at=?
       WHERE prediction_id=? AND lease_token=?`).run(paused?'paused':'retry',new Date(time+Math.min(3600_000,60_000*2**(job!.attempts-1))).toISOString(),code,new Date(time).toISOString(),id,token);
@@ -116,7 +119,7 @@ export function observeDueDeadlines(now=Date.now()){
       .run(iso,iso,iso,process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0);
 }
 
-export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Options={}) {
+export async function workerTick({clock=Date.now,fetchCandles=assetCandles,runSeries=repeatSeriesTick}:Options={}) {
   const now=clock(),iso=new Date(now).toISOString(),owner=randomUUID(),database=db();
   database.prepare("INSERT OR IGNORE INTO worker_state(id,next_tick_at) VALUES (1,'1970-01-01T00:00:00.000Z')").run();
   const leader=database.prepare(`UPDATE worker_state SET owner=?,lease_until=?,next_tick_at=?,heartbeat_at=?,last_error=NULL
@@ -142,6 +145,7 @@ export async function workerTick({clock=Date.now,fetchCandles=assetCandles}:Opti
     if(process.env.CALBOK_WORKER_ENABLED==='true') {
       await entryPriceTick(clock,fetchCandles);
       await automaticMemoryTick();
+      await runSeries();
       await automaticRecall('operator');
     }
   } catch {database.prepare("UPDATE worker_state SET last_error='WORKER_TICK_FAILED' WHERE id=1 AND owner=?").run(owner);}

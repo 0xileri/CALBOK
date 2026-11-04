@@ -5,7 +5,7 @@ export function PathToCaution({groups}:{groups:IntegrationProof['groups']}){
   {groups.length?<div className="caution-groups">{groups.map(group=><article key={group.key} className={group.closest?'caution-group closest':'caution-group'}>
    <h4>{group.caller} · {group.asset}</h4><p>{group.direction} · {group.horizon}</p>
    {group.closest&&<span className="badge">Closest to threshold</span>}
-   <dl><dt>Completed scored memories</dt><dd>{group.count}/5</dd><dt>Win rate</dt><dd>{group.winRate===null?'—':group.winRate+'%'}</dd><dt>Next settlement</dt><dd>{group.nextSettlementAt?<><time dateTime={group.nextSettlementAt}>{new Date(group.nextSettlementAt).toUTCString()}</time><small>Earliest finalized exit candle; provider confirmation and queue capacity may take longer.</small></>:'No pending call in this group'}</dd></dl>
+   <dl><dt>Completed scored memories</dt><dd>{group.count}/5 · {group.scheduledCount} owner-scheduled repeats</dd><dt>Win rate</dt><dd>{group.winRate===null?'—':group.winRate+'%'}</dd><dt>Next settlement</dt><dd>{group.nextSettlementAt?<><time dateTime={group.nextSettlementAt}>{new Date(group.nextSettlementAt).toUTCString()}</time><small>Earliest finalized exit candle; provider confirmation and queue capacity may take longer.</small></>:'No pending call in this group'}</dd></dl>
   </article>)}</div>:<p>Lock a genuine call to start a group.</p>}
  </section>;
 }

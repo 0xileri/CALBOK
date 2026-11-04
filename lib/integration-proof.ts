@@ -1,3 +1,4 @@
+import {scheduledRepeat} from './scheduled-repeat';
 import {exitCandleFinalizedAt} from './settlement-timing';
 import {createHash} from 'node:crypto';
 import type {Receipt} from './db';
@@ -48,7 +49,7 @@ function settlementRecord(row: Receipt) {
   if (!isSettlementEvidence(evidence) || !['won','lost','neutral'].includes(profileOutcome(row))) return [];
   const {provider,returnPct,entry,exit} = evidence;
   return [{
-    receiptId:row.id,asset:row.asset,direction:row.direction,horizon:row.horizon,
+    receiptId:row.id,scheduledRepeat:scheduledRepeat(row),asset:row.asset,direction:row.direction,horizon:row.horizon,
     lockedAt:row.locked_at,deadline:row.deadline,snapshotHash:row.snapshot_hash,
     outcome:row.outcome,method:row.method,provider,returnPct,entry:exportCandle(entry),exit:exportCandle(exit)
   }];
@@ -122,13 +123,13 @@ function nextStep(locked: Receipt[], settlements: ReturnType<typeof settlementRe
 
 export function memoryGroupProgress(receipts: Receipt[], completed: CompletionProof[]) {
   const completedIds = new Set(completed.map(row=>row.prediction_id));
-  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number;wins:number;losses:number;nextDeadline:string|null}>();
+  const groups = new Map<string,{key:string;caller:string;asset:string;direction:string;horizon:string;count:number;wins:number;losses:number;scheduledCount:number;nextDeadline:string|null}>();
   for (const receipt of receipts.filter(isLocked)) {
     const {caller,asset,direction,horizon} = receipt;
     const key = JSON.stringify([caller.trim().toLowerCase(),asset,direction,horizon]);
-    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0,wins:0,losses:0,nextDeadline:null};
+    const group = groups.get(key) ?? {key,caller,asset,direction,horizon,count:0,wins:0,losses:0,scheduledCount:0,nextDeadline:null};
     const outcome = profileOutcome(receipt);
-    if (completedIds.has(receipt.id) && (outcome==='won' || outcome==='lost')) {group.count++;if(outcome==='won')group.wins++;else group.losses++;}
+    if (completedIds.has(receipt.id) && (outcome==='won' || outcome==='lost')) {group.count++;if(scheduledRepeat(receipt))group.scheduledCount++;if(outcome==='won')group.wins++;else group.losses++;}
     if((!receipt.outcome||receipt.outcome==='pending') && Number.isFinite(Date.parse(receipt.deadline)) && (!group.nextDeadline||Date.parse(receipt.deadline)<Date.parse(group.nextDeadline)))group.nextDeadline=receipt.deadline;
     groups.set(key,group);
   }
