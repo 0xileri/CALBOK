@@ -15,7 +15,7 @@ export async function recordEntryPrice(id:string, fetchCandles=assetCandles, clo
   entryPriceSchema();
   const database=db();
   const existing=database.prepare('SELECT * FROM entry_prices WHERE prediction_id=?').get(id) as EntryPrice|undefined;
-  if (existing?.candle || existing?.error==='TATUM_PRICE_BOUNDARY_UNAVAILABLE') return existing;
+  if (existing?.candle || ['TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_STALE_CANDLE'].includes(existing?.error||'')) return existing;
   const receipt=listReceipts().find(row=>row.id===id);
   if (!receipt) return;
   const now=clock(), boundary=Date.parse(receipt.locked_at);
@@ -39,7 +39,7 @@ export async function entryPriceTick(clock=Date.now,fetchCandles=assetCandles) {
   entryPriceSchema();
   const time=clock();
   const rows=db().prepare(`SELECT p.id FROM predictions p LEFT JOIN entry_prices e ON e.prediction_id=p.id
-    WHERE e.candle IS NULL AND COALESCE(e.error,'')!='TATUM_PRICE_BOUNDARY_UNAVAILABLE' AND p.locked_at<=? AND (e.checked_at IS NULL OR e.checked_at<=?)
+    WHERE e.candle IS NULL AND COALESCE(e.error,'') NOT IN ('TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_STALE_CANDLE') AND p.locked_at<=? AND (e.checked_at IS NULL OR e.checked_at<=?)
     AND (COALESCE((SELECT owner_id FROM prediction_owners WHERE prediction_id=p.id),'operator')='operator' OR ?=1)
     ORDER BY COALESCE(e.checked_at,''),p.locked_at LIMIT 3`)
     .all(new Date(time-120_000).toISOString(),new Date(time-300_000).toISOString(),process.env.CALBOK_USER_PROVIDER_ACCESS==='true'?1:0) as {id:string}[];

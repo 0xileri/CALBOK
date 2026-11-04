@@ -1,3 +1,4 @@
+import {coinbaseCandles} from './coinbase-pricing';
 import { z } from 'zod';
 import { hash } from './db';
 import type { Candle } from './domain';
@@ -58,6 +59,7 @@ export async function priceCandle(asset:string, boundary:number, {clock=Date.now
   // Normalize only this exact convention and retain the raw boundary for audits.
   const candle=normalizeTatumCandle(raw);
   try {
+    if (Math.abs(candle.openTime-requested)>120_000) throw new ProviderError('TATUM_STALE_CANDLE');
     validateTatumBoundary(candle,boundary);
     if (candle.closeTime>clock()) throw new ProviderError('TATUM_CANDLE_NOT_YET_AVAILABLE');
     return candle;
@@ -76,7 +78,13 @@ export async function priceCandle(asset:string, boundary:number, {clock=Date.now
 }
 export async function assetCandles(asset:string,boundary:number):Promise<Candle[]> {
   const token=parseGmgnAssetId(asset);
-  return token?gmgnCandles(token.chain,token.address,boundary):[await priceCandle(asset,boundary)];
+  if (token) return gmgnCandles(token.chain,token.address,boundary);
+  try {return [await priceCandle(asset,boundary)];}
+  catch (error) {
+    if (!(error instanceof ProviderError) || !['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE'].includes(error.code)) throw error;
+    try {return await coinbaseCandles(asset,boundary);}
+    catch {throw error;}
+  }
 }
 export async function memoryClient(namespace:string) {
   if (!configuration().walrus || !configuration().mainnet) throw new ProviderError('WALRUS_MAINNET_NOT_CONFIGURED');

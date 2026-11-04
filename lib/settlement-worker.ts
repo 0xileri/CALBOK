@@ -32,7 +32,7 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     AND (?=1 OR (status IN ('queued','retry','running') AND next_attempt_at<=?)) RETURNING attempts`).get(token,new Date(now+LEASE_MS).toISOString(),iso,id,iso,force?1:0,iso) as {attempts:number}|undefined;
   if(!job)return {message:'Settlement is already running, awaiting its next retry, or paused for review.'};
   function defer(code:string) {
-    const time=clock(),paused=code==='TATUM_PRICE_BOUNDARY_UNAVAILABLE' || job!.attempts>=MAX_ATTEMPTS;
+    const time=clock(),paused=['TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_STALE_CANDLE'].includes(code) || job!.attempts>=MAX_ATTEMPTS;
     db().prepare(`UPDATE settlement_jobs SET status=?,next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error=?,updated_at=?
       WHERE prediction_id=? AND lease_token=?`).run(paused?'paused':'retry',new Date(time+Math.min(3600_000,60_000*2**(job!.attempts-1))).toISOString(),code,new Date(time).toISOString(),id,token);
     return {message:paused?'Settlement needs manual review. Check provider coverage, then retry manually.':'Evidence unavailable. A retry has been scheduled.',error:code};
@@ -41,12 +41,13 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
     const candles=(await Promise.all([fetchCandles(receipt.asset,Date.parse(receipt.locked_at)),fetchCandles(receipt.asset,Date.parse(receipt.deadline))])).flat();
     const result=settle(receipt.direction as 'bullish'|'bearish',Date.parse(receipt.locked_at),Date.parse(receipt.deadline),candles,clock());
     if(!['won','lost','neutral'].includes(result.outcome))return defer('PRICE_COVERAGE_UNAVAILABLE');
+    if ((result.entry?.provider||'Tatum') !== (result.exit?.provider||'Tatum')) return defer('PRICE_PROVIDER_MISMATCH');
     const database=db(),completed=new Date(clock()).toISOString();
     database.exec('BEGIN IMMEDIATE');
     try {
       const owned=database.prepare('SELECT prediction_id FROM settlement_jobs WHERE prediction_id=? AND lease_token=? AND lease_until>?').get(id,token,completed);
       if(!owned){database.exec('ROLLBACK');return {message:'Settlement lease expired; the queued job will be recovered.'};}
-      const evidence=JSON.stringify({...result,provider:parseGmgnAssetId(receipt.asset)?'GMGN':'Tatum',asset:receipt.asset});
+      const evidence=JSON.stringify({...result,provider:parseGmgnAssetId(receipt.asset)?'GMGN':result.entry?.provider||'Tatum',asset:receipt.asset});
       const inserted=database.prepare('INSERT OR IGNORE INTO settlements VALUES (?,?,?,?,?)').run(id,result.outcome,evidence,METHOD,completed);
       if(inserted.changes)database.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?)').run(randomUUID(),id,'prediction_settled',hash(evidence),completed);
       database.prepare("UPDATE settlement_jobs SET status='done',lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=? WHERE prediction_id=? AND lease_token=?").run(completed,id,token);

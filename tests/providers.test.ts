@@ -41,7 +41,7 @@ test('recorded entry and exit responses expose stale timestamps without leaking 
           assert.equal(new URL(url).searchParams.get('interval'),'1m');
           return response;
         }
-      }),/TATUM_PRICE_BOUNDARY_UNAVAILABLE/);
+      }),/TATUM_STALE_CANDLE/);
     }
     assert.equal(events.length,2);
     assert.deepEqual(events[0][1],{asset:'BTC',unix:recorded.entryUnix+1,boundary:recorded.entryUnix-35_000,openTime:recorded.entryResponse.openTime,closeTime:recorded.entryResponse.closeTime});

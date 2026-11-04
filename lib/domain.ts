@@ -14,7 +14,7 @@ export const claimSchema = z.object({
 });
 export type Claim = z.infer<typeof claimSchema>;
 export type Outcome = 'won' | 'lost' | 'neutral' | 'pending' | 'unscorable';
-export type Candle = { openTime: number; closeTime: number; sourceCloseTime?: number; open: string; high: string; low: string; close: string; hash: string };
+export type Candle = {provider?:string;product?:string;raw?:unknown; openTime: number; closeTime: number; sourceCloseTime?: number; open: string; high: string; low: string; close: string; hash: string };
 export const METHOD = 'directional-open-v1';
 export const MIN_SAMPLE = 5;
 export function boundaryCandle(candles: Candle[], boundary: number, now: number): Candle | undefined {

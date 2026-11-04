@@ -1,3 +1,4 @@
+import {verifiedCoinbaseCandle} from './coinbase-pricing';
 import type {Receipt} from './db';
 import {METHOD,settle,stats as scoredStats,type Candle} from './domain';
 
@@ -8,7 +9,9 @@ export function profileOutcome(receipt:Receipt):ProfileOutcome {
   if(!['won','lost','neutral'].includes(receipt.outcome) || receipt.method!==METHOD || !receipt.evidence)return 'unverified';
   try {
     const evidence=JSON.parse(receipt.evidence) as {asset:string;provider:string;outcome:string;returnPct:string;entry:Candle;exit:Candle};
-    if(evidence.asset!==receipt.asset || evidence.provider!==(receipt.asset_provider||'Tatum') || evidence.outcome!==receipt.outcome)return 'unverified';
+    const fallback=evidence.provider==='Coinbase' && (receipt.asset_provider||'Tatum')==='Tatum'
+      && verifiedCoinbaseCandle(receipt.asset,evidence.entry) && verifiedCoinbaseCandle(receipt.asset,evidence.exit);
+    if(evidence.asset!==receipt.asset || (!fallback && evidence.provider!==(receipt.asset_provider||'Tatum')) || evidence.outcome!==receipt.outcome)return 'unverified';
     if(!/^[a-f0-9]{64}$/.test(evidence.entry.hash) || !/^[a-f0-9]{64}$/.test(evidence.exit.hash))return 'unverified';
     if(!['bullish','bearish'].includes(receipt.direction))return 'unverified';
     const checked=settle(receipt.direction as 'bullish'|'bearish',Date.parse(receipt.locked_at),Date.parse(receipt.deadline),[evidence.entry,evidence.exit],evidence.exit.closeTime);
