@@ -1,3 +1,4 @@
+import {drawBrandLogo} from './brand-canvas';
 import {scheduledRepeatLabel} from './scheduled-repeat';
 import type { Receipt } from './db';
 
@@ -55,9 +56,7 @@ export async function downloadReceiptPng(receipt:Receipt) {
   context.textBaseline='top';
   function text(value:string,x:number,y:number,font:string,color='#172c26') {context!.font=font;context!.fillStyle=color;context!.fillText(value,x,y);}
   function rule(y:number){context!.strokeStyle='#bbc9ad';context!.setLineDash([6,7]);context!.beginPath();context!.moveTo(padding,y);context!.lineTo(width-padding,y);context!.stroke();context!.setLineDash([]);}
-  context.save();context.translate(padding-7,66);context.scale(1.8,1.8);context.fillStyle='#174c3c';
-  context.fill(new Path2D('M36 12H18a8 8 0 0 0-8 8v16l5-3 5 3 5-3 5 3 6-4v-4H21a4 4 0 0 1-4-4v-3a3 3 0 0 1 3-3h16V12Z'));
-  context.strokeStyle='#ef7145';context.lineWidth=3;context.lineJoin='round';context.beginPath();context.moveTo(32,20);context.lineTo(37,24);context.lineTo(32,28);context.stroke();context.restore();
+  await drawBrandLogo(context,padding,66,72);
   text('CALBOK.',padding+82,85,'bold 43px Arial');
   text('CALLS FADE. RECEIPTS STAY.',padding,164,'18px monospace','#5d7050');
   rule(212);

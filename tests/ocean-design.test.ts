@@ -22,11 +22,11 @@ test('decorative wireframe is deterministic, hidden from assistive technology, a
  for(const forbidden of ['BTC','Won','Lost','<text','<script','<animate','http:','https:'])assert.ok(!html.includes(forbidden));
 });
 
-test('sign-in-inspired theme keeps CALBOK navigation and responsive white panels without a dashboard sidebar',()=>{
+test('sign-in-inspired theme keeps CALBOK navigation and responsive cream panels without a dashboard sidebar',()=>{
  const html=renderToStaticMarkup(createElement(SiteShell,null,createElement('main',null,'TEST CONTENT')));
  assert.match(html,/ocean-site/);assert.match(html,/landscape-background/);assert.match(html,/Main navigation/);assert.match(html,/Skip to content/);
  for(const path of ['/feed','/log','/my-calls','/signin'])assert.ok(html.includes('href="'+path+'"'));
  assert.ok(!html.includes('console-sidebar'));assert.ok(!html.includes('DigitalOcean'));
  const css=readFileSync(new URL('../app/ocean.css',import.meta.url),'utf8');
- for(const rule of ['background:#001b18','background:#050706','font-family:Georgia','max-width:480px','background:white','@media(max-width:520px)','prefers-reduced-motion:reduce','pointer-events:none'])assert.ok(css.includes(rule),rule);
+ for(const rule of ['background:#142c25','background:#ef7145','font-family:Georgia','max-width:480px','background:#f4f2e9','@media(max-width:520px)','prefers-reduced-motion:reduce','pointer-events:none'])assert.ok(css.includes(rule),rule);
 });

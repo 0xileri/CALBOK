@@ -1,8 +1,9 @@
+import {brandAssets} from '@/lib/brand-identity';
 import { ArrowDown, ArrowRight, ArrowUp, ArrowLeft, LockKeyhole, ShieldCheck, Database, GitBranch } from 'lucide-react';
 
 /** The open C is a conversation; the notched edge makes it a receipt. */
 export function BrandMark({className=''}:{className?:string}) {
-  return <svg className={className} viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M36 12H18a8 8 0 0 0-8 8v16l5-3 5 3 5-3 5 3 6-4v-4H21a4 4 0 0 1-4-4v-3a3 3 0 0 1 3-3h16V12Z" fill="currentColor"/><path d="m32 20 5 4-5 4" stroke="var(--signal, #ef7145)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/></svg>;
+  return <svg className={className} viewBox="0 0 400 400" aria-hidden="true" focusable="false"><image href={brandAssets.logo} width="400" height="400"/></svg>;
 }
 
 export function HeroReceipt() {
