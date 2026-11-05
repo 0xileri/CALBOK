@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
 import type {AccountIdentity} from './account-profile';
+import {WireframeLandscape} from './wireframe-landscape';
 import {BrandMark} from './brand';
 import {receiptIdFromFragment} from '@/lib/receipt-links';
 import {callPath} from '@/lib/call-presentation';
@@ -15,7 +16,8 @@ export function SiteShell({children}:{children:ReactNode}){
   const path=usePathname();
   useEffect(()=>{if(path!=='/')return;const id=receiptIdFromFragment(window.location.hash);if(id)window.location.replace(callPath(id));else if(window.location.hash==='#signin')window.location.replace('/signin');},[path]);
   useEffect(()=>{let active=true;fetch('/api/auth',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(active)setSession({...data,loading:false});}).catch(()=>{if(active)setSession({loading:false,user:null,emailAvailable:false,publicSignup:false});});return()=>{active=false;};},[path]);
-  return <SessionContext.Provider value={session}><div className="simple-site">
+  return <SessionContext.Provider value={session}><div className={'simple-site ocean-site'+(path==='/signin'?' auth-surface':'')}>
+    <WireframeLandscape/>
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="site-header"><Link className="site-logo" href="/" aria-label="CALBOK home"><BrandMark/>CALBOK<span className="logo-dot">.</span></Link>
       <nav aria-label="Main navigation">{[['/feed','Feed'],['/log','Log a call'],['/my-calls','My calls']].map(([href,label])=><Link key={href} href={href} aria-current={path===href?'page':undefined}>{label}</Link>)}
