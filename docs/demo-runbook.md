@@ -20,7 +20,7 @@ Use the production owner workspace at https://calbok.xyz/. This runbook creates 
 
 1. Leave the worker running through the deadline. No manual click is needed. Receipt details show **Deadline observed** on the next healthy one-minute sweep; this is acknowledgment, not a finalized verdict.
 2. The eligible exit candle must open at or after the boundary and then finish its full minute. Earliest finality is `ceil(deadline / 60,000) * 60,000 + 60,000`—60–120 seconds after the deadline. The card shows this earliest time, not a provider SLA. The worker limits provider processing to three receipts per cycle; backlog, outages and retries can add delay.
-3. Show the stored entry/exit timestamps, prices, named source, pair and raw-response hash, then the immutable won/lost/neutral verdict. Catalog pricing tries Tatum, Coinbase and Binance in order; GMGN token IDs use GMGN. Binance quotes are USDT, not USD. Entry and exit must use the same provider.
+3. Show the stored entry/exit timestamps, prices, named source, pair and raw-response hash, then the immutable won/lost/neutral verdict. Catalog pricing uses Tatum first; Coinbase, then Binance, back it up only when Tatum has no valid candle within 5 minutes of the boundary minute, and the call page labels them as backups; GMGN token IDs use GMGN. Binance quotes are USDT, not USD. Entry and exit must use the same provider.
 4. Point to **Verify a settled outcome** in Integration progress. **Awaiting outcome** drops when settlement is recorded. **Verified win rate** uses wins/losses; it is not the same as the group's completed-memory win rate.
 5. If evidence is missing or stale, show the pending/retry/manual-review state truthfully. Do not replace a candle, force an outcome or alter SQL to continue the demo.
 

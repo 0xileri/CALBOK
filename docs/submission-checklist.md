@@ -11,7 +11,7 @@ Record the existing five-memory recall using [the demo script](demo-script.md). 
 | Capture and journal | Implemented: text/screenshot capture, browser-local English OCR, image paste/drop, duplicate warnings, private reviews, full-history pagination and filtered CSV |
 | Caller profiles | Implemented: captured/reviewed counts and captured history alongside separately verified performance |
 | Immutable prospective SQL capture | Implemented and tested; first genuine live receipt locked |
-| Deterministic directional settlement | Reproducibility tested; historical provider samples checked previously. First genuine live lock → deadline → settlement verified |
+| Deterministic directional settlement | Reproducibility tested; historical provider samples checked previously. First genuine live lock → deadline → settlement verified. Tatum OHLCV is the primary price source; Coinbase USD, then Binance USDT, back it up only when Tatum has no valid candle within 5 minutes of the boundary minute. Production logs on 5 November show Tatum returning the same 29 October 14:29 UTC BTC candle for every request, so the recorded settlements used the Coinbase backup. Confirm Tatum returns current candles before the demo |
 | Relevant Tatum Sui Mainnet read | Fresh Tatum gRPC GetCoinInfo verified at 11:58:56 UTC on 6 November. [RPC evidence](proof/tatum-sui-rpc-2026-11.md) |
 | Walrus Mainnet remember → done → recall | 38 confirmed Mainnet completions and six SQL-cited recalls |
 | 10 completed Mainnet memories | **38 / 10 confirmed** at the dated check. Accepted/running jobs do not count |

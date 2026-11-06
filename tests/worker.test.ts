@@ -51,6 +51,9 @@ test('durable worker: deadlines, overlapping checks, retries, pause, and lease r
     const recent=due();
     await runSettlement(recent.id,{clock,fetchCandles:async()=>{throw new ProviderError('TATUM_CANDLE_NOT_YET_AVAILABLE');}});
     assert.equal(db().prepare('SELECT status FROM settlement_jobs WHERE prediction_id=?').get(recent.id)?.status,'retry');
+    // Waiting on Tatum's grace window rechecks next minute and does not spend an attempt.
+    const waiting=db().prepare('SELECT attempts,next_attempt_at FROM settlement_jobs WHERE prediction_id=?').get(recent.id)!;
+    assert.equal(waiting.attempts,0);assert.equal(Date.parse(String(waiting.next_attempt_at)),now+60_000);
     db().prepare("UPDATE settlement_jobs SET status='paused' WHERE prediction_id=?").run(recent.id);
     const recoveredEntry=due();
     const boundaries:number[]=[];

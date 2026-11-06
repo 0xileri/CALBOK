@@ -11,9 +11,13 @@ export {ProviderError} from './provider-error';
 export function configuration() { return {tatum:!!process.env.TATUM_API_KEY,gmgn:!!process.env.GMGN_API_KEY,walrus:!!(process.env.MEMWAL_PRIVATE_KEY && process.env.MEMWAL_ACCOUNT_ID),mainnet:process.env.MEMWAL_NETWORK==='mainnet'}; }
 async function tatum(url:string, body?:unknown) {
   if (!process.env.TATUM_API_KEY) throw new ProviderError('TATUM_NOT_CONFIGURED');
-  const response = await fetch(url,{method:body?'POST':'GET',headers:{'x-api-key':process.env.TATUM_API_KEY,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15_000),cache:'no-store'});
+  let response:Response;
+  try {
+    response = await fetch(url,{method:body?'POST':'GET',headers:{'x-api-key':process.env.TATUM_API_KEY,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15_000),cache:'no-store'});
+  } catch {throw new ProviderError('TATUM_UNAVAILABLE');}
   if (!response.ok) throw new ProviderError(`TATUM_HTTP_${response.status}`);
-  return response.json() as Promise<unknown>;
+  try {return await response.json() as unknown;}
+  catch {throw new ProviderError('TATUM_RESPONSE_UNVERIFIED');}
 }
 export async function suiMetadata() {
   if(!process.env.TATUM_API_KEY)throw new ProviderError('TATUM_NOT_CONFIGURED');
@@ -48,6 +52,14 @@ export function validateTatumBoundary(candle:Candle,boundary:number):Candle {
   return candle;
 }
 
+/**
+ * Tatum is the primary price source. It gets this long after the boundary minute opens
+ * to publish a valid candle before the Coinbase USD, then Binance USDT, backups are tried.
+ */
+export const TATUM_GRACE_MS = 5*60_000;
+// Tatum answered, but definitively not with the boundary minute: back up immediately.
+const TATUM_DEFINITE_MISS = ['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_HTTP_404'];
+
 type PriceCandleOptions = {clock?:()=>number;request?:(url:string)=>Promise<unknown>};
 export async function priceCandle(asset:string, boundary:number, {clock=Date.now,request=tatum}:PriceCandleOptions={}):Promise<Candle> {
   // Query inside the first eligible minute, avoiding inclusive/exclusive endpoint ambiguity.
@@ -58,7 +70,7 @@ export async function priceCandle(asset:string, boundary:number, {clock=Date.now
   const raw = await request(url.toString());
   // Tatum's live 1m response uses an inclusive final millisecond (duration 59,999).
   // Normalize only this exact convention and retain the raw boundary for audits.
-  if(raw===null) throw new ProviderError(clock()<requested+180_000?'TATUM_CANDLE_NOT_YET_AVAILABLE':'TATUM_PRICE_BOUNDARY_UNAVAILABLE');
+  if(raw===null) throw new ProviderError(clock()<requested+TATUM_GRACE_MS?'TATUM_CANDLE_NOT_YET_AVAILABLE':'TATUM_PRICE_BOUNDARY_UNAVAILABLE');
   const candle=normalizeTatumCandle(raw);
   try {
     if (Math.abs(candle.openTime-requested)>120_000) throw new ProviderError('TATUM_STALE_CANDLE');
@@ -72,7 +84,7 @@ export async function priceCandle(asset:string, boundary:number, {clock=Date.now
       asset,unix:requested+1,boundary,openTime:candle.openTime,closeTime:candle.sourceCloseTime
     });
     if (error.code==='TATUM_CANDLE_NOT_YET_AVAILABLE' ||
-        (candle.openTime<requested && clock()<requested+180_000)) {
+        (candle.openTime<requested && clock()<requested+TATUM_GRACE_MS)) {
       throw new ProviderError('TATUM_CANDLE_NOT_YET_AVAILABLE');
     }
     throw error;
@@ -83,8 +95,11 @@ export async function assetCandles(asset:string,boundary:number):Promise<Candle[
   if (token) return gmgnCandles(token.chain,token.address,boundary);
   try {return [await priceCandle(asset,boundary)];}
   catch (error) {
-    const finalized=Date.now()>=Math.ceil(boundary/60_000)*60_000+60_000;
-    if (!(error instanceof ProviderError) || (!['TATUM_STALE_CANDLE','TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_HTTP_404'].includes(error.code) && !(finalized&&error.code==='TATUM_CANDLE_NOT_YET_AVAILABLE'))) throw error;
+    // Missing credentials stay an explicit error. A definite miss backs up at once; lag,
+    // outages and malformed responses keep retrying Tatum until its grace window ends.
+    const graceOver=Date.now()>=Math.ceil(boundary/60_000)*60_000+TATUM_GRACE_MS;
+    if (!(error instanceof ProviderError) || error.code==='TATUM_NOT_CONFIGURED' ||
+        !(TATUM_DEFINITE_MISS.includes(error.code) || graceOver)) throw error;
     try {return await coinbaseCandles(asset,boundary);}
     catch (fallbackError) {
       if (!(fallbackError instanceof ProviderError) || !['COINBASE_MARKET_UNSUPPORTED','COINBASE_BOUNDARY_UNAVAILABLE'].includes(fallbackError.code)) throw fallbackError;

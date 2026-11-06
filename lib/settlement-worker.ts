@@ -47,6 +47,14 @@ export async function runSettlement(id:string,{force=false,clock=Date.now,fetchC
   if(!job)return {message:'Settlement is already running, awaiting its next retry, or paused for review.'};
   function defer(code:string) {
     if(code!=='TATUM_CANDLE_NOT_YET_AVAILABLE')stopSeriesForReceipt(id,'PRICE_PROVIDER_FAILURE');
+    // Tatum is still inside its grace window (see TATUM_GRACE_MS): check again next minute
+    // without spending an attempt. Backups take over once the window ends.
+    if(code==='TATUM_CANDLE_NOT_YET_AVAILABLE'){
+      const time=clock();
+      db().prepare(`UPDATE settlement_jobs SET status='retry',attempts=MAX(0,attempts-1),next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error=?,updated_at=?
+        WHERE prediction_id=? AND lease_token=?`).run(new Date(time+60_000).toISOString(),code,new Date(time).toISOString(),id,token);
+      return {message:'Waiting for Tatum to publish the candle. A retry has been scheduled.',error:code};
+    }
     const time=clock(),paused=['TATUM_PRICE_BOUNDARY_UNAVAILABLE','TATUM_STALE_CANDLE'].includes(code) || job!.attempts>=MAX_ATTEMPTS;
     db().prepare(`UPDATE settlement_jobs SET status=?,next_attempt_at=?,lease_token=NULL,lease_until=NULL,last_error=?,updated_at=?
       WHERE prediction_id=? AND lease_token=?`).run(paused?'paused':'retry',new Date(time+Math.min(3600_000,60_000*2**(job!.attempts-1))).toISOString(),code,new Date(time).toISOString(),id,token);
