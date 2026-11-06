@@ -2,11 +2,78 @@
 
 Group: **@CryptoKaleo / BTC / bearish / 15m**. Owner-confirmed scheduled repeat predictions; these are not new organic posts by the named caller. No backdating, fabricated prices or hand-inserted records.
 
+Status: **caution-proven**. On 6 November 2026, two later calls in this group got the caution warning. Their recall cited 8 completed Walrus Mainnet memories of earlier calls in the same group, all completed before the later call locked, with 3 won and 5 lost (**37.5%**, below the 40% threshold).
+
+Checked: **2026-11-06T13:34:08.720Z** (14:34:08 Africa/Lagos), read from the live owner APIs `GET /api/integration-proof`, `GET /api/workspace` and `GET /api/repeat-series` on calbok.xyz. No credential value is recorded.
+
+## Caution warnings
+
+The rule (`lib/caution-display.ts`): the recall must be marked `caution`, cite at least 5 matching completed memories with at least 5 SQL citation rows, and the matching win rate must be below 40%. A memory only counts if its job is done, has a blob ID, is on Mainnet and completed before the later call's lock.
+
+| Later call | Locked | Recall and warning | Cited | Matching record | Repeat series | Its own result |
+| --- | --- | --- | --- | --- | --- | --- |
+| `CB-31a245b9-ce4b-4164-be2d-9008e60e49b4` | 06 Nov 12:37:46 UTC / 13:37:46 Lagos | 06 Nov 12:37:48 UTC / 13:37:48 Lagos | 8 | 3 won / 5 lost = **37.5%** | `RS-3bb6e432` step 3 | won via Tatum, settled 06 Nov 12:54:45 UTC / 13:54:45 Lagos |
+| `CB-3a5ab0eb-168c-40d7-8691-e6bdad920595` | 06 Nov 12:41:35 UTC / 13:41:35 Lagos | 06 Nov 12:41:37 UTC / 13:41:37 Lagos | 8 | 3 won / 5 lost = **37.5%** | none (owner-confirmed lock) | won via Tatum, settled 06 Nov 12:58:45 UTC / 13:58:45 Lagos |
+
+Both stored reviews pass `hasCaution`, so each call page renders this warning (`components/caution-notice.tsx`):
+
+> **Caution: matching calls have a low win rate.**
+> 37.5% won across 8 matching calls. Open Proof details to inspect the cited results.
+
+The 8 cited memories, re-verified by the server's SQL citation for each warning (caller `@CryptoKaleo`, BTC, bearish, 15m, memory completed before the lock time):
+
+| # | Past call | Result | Price source | Locked | Memory completed | Walrus blob ID | Repeat series |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `CB-afeb1880-4caa-4a86-b2a0-39f2d7aa1b0d` | lost | Coinbase | 05 Nov 04:30:44 UTC / 05:30:44 Lagos | 05 Nov 04:49:41 UTC / 05:49:41 Lagos | `nNqALC2eg55hQId_kc158Z3bzLYBDmGcM7YGkyHsEiE` | original call |
+| 2 | `CB-1d6e5327-66d9-400f-b044-aa6dd872d100` | won | Coinbase | 05 Nov 04:55:15 UTC / 05:55:15 Lagos | 05 Nov 05:13:15 UTC / 06:13:15 Lagos | `VCMDRpE-tUV319QKNEcTnkXqjpqXS7KfCPs5JlNsr3c` | `RS-d8bce9be` |
+| 3 | `CB-228318f7-fa45-41ba-bfbe-7b2c3fa3d865` | lost | Coinbase | 05 Nov 05:13:15 UTC / 06:13:15 Lagos | 05 Nov 05:31:16 UTC / 06:31:16 Lagos | `y9pmW4KMs7dpQSynfdTr84OVyPVQL_pIROfE9Cp_45Y` | `RS-d8bce9be` |
+| 4 | `CB-e192f7b0-3296-4a84-9c07-edd92367b049` | won | Coinbase | 05 Nov 05:31:16 UTC / 06:31:16 Lagos | 05 Nov 05:49:16 UTC / 06:49:16 Lagos | `qAuSHVS5TFxY87uTJcezclK1bWKBoE5DRUHhNAPZ0TU` | `RS-d8bce9be` |
+| 5 | `CB-7459b00d-eafc-46a1-ac5e-b91672f26d24` | won | Coinbase | 05 Nov 05:49:16 UTC / 06:49:16 Lagos | 05 Nov 06:07:17 UTC / 07:07:17 Lagos | `XXRJPBo2JplvG_Q8Ohzw7VV4FG926RZMEPCOCVuQH0Q` | `RS-d8bce9be` |
+| 6 | `CB-be4c9da4-cb7e-476b-82b8-890a353b6e90` | lost | Coinbase | 05 Nov 06:07:17 UTC / 07:07:17 Lagos | 05 Nov 06:25:48 UTC / 07:25:48 Lagos | `LaxyYbn5gHFM5GQVdlvk4SoEjC6AeqKkIlAOa4b-Kc8` | `RS-d8bce9be` |
+| 7 | `CB-a902df65-e64f-4452-b378-c129fcf32c42` | lost | Tatum | 06 Nov 12:01:21 UTC / 13:01:21 Lagos | 06 Nov 12:19:22 UTC / 13:19:22 Lagos | `SCGWdKEiK4brBRukbAZourl_GSPrUchCkRm97q3QuYs` | `RS-3bb6e432` |
+| 8 | `CB-32c11e6e-fce7-4d23-b846-d0d7c61e6b28` | lost | Tatum | 06 Nov 12:19:22 UTC / 13:19:22 Lagos | 06 Nov 12:37:45 UTC / 13:37:45 Lagos | `91EYfkeIoYWpGy95UteeAxrSmUSKwYCr6bl6PLDPv-A` | `RS-3bb6e432` |
+
+Checks against the rule, for both warnings:
+
+- **Sample:** 8 cited memories and 8 SQL rows, at least 5 required.
+- **Win rate:** 3 won and 5 lost is 37.5%, below 40%. Recounted from the cited outcomes; it matches the stored review.
+- **Timing:** every cited memory completed before the lock. The closest is `CB-32c11e6e…`, completed at 12:37:45.998 UTC, 32 ms before `CB-31a245b9…` locked at 12:37:46.030 UTC. The scheduled repeat locks right after the previous memory completes.
+- **Same group:** all 8 have caller `@CryptoKaleo`, BTC, bearish, 15m. The recall also retrieved `CB-dd78b73e-76de-4782-871c-62ac8fa05bdc`, a lost BTC bearish **24h** call, and correctly did not cite it.
+- **Network:** all 8 memories record `mainnet`.
+
+What happened next:
+
+- Series `RS-3bb6e432-d185-4e2f-aaac-64e17d5b3caa` stopped itself with `stop_reason: CAUTION_TRIGGERED` at 12:37:48.670 UTC, 3 ms after the first warning, after creating 3 of its 6 repeat slots.
+- `CB-3a5ab0eb…` was a separate owner-confirmed lock of the same terms, outside any series. Its recall cited the same 8 memories, because `CB-31a245b9…` had not settled yet.
+- Both warned calls then **won**, settled by Tatum. A caution describes the matching record so far; it does not predict the next result. `CB-31a245b9…` was remembered on Mainnet at 12:55:46 UTC (blob `2m78_mv1A3-TdecWrD1SqtTelOvK4qx4IQqWnCpm7gM`), which moves the group to 4 won / 5 lost (44.4%). `CB-3a5ab0eb…` had no completed memory at the check.
+
+Disclosure: only `CB-afeb1880…` is the original logged call. The other 7 cited calls are owner-scheduled repeats of the same terms (series `RS-d8bce9be…` and `RS-3bb6e432…`). A repeat is a new prospective re-lock by the owner; it does not show that @CryptoKaleo posted again. Every one of these calls is private, so judges can't open their call pages; the receipt, job and blob IDs above are the public identifiers.
+
+## Learning over time
+
+Every recall in this group, in order. The same caller, asset, direction and window built up a record on Walrus, and the product changed what it showed once the record crossed the rule.
+
+| Call | Recall | Matching memories cited | Matching record | Shown |
+| --- | --- | --- | --- | --- |
+| `CB-1d6e5327-66d9-400f-b044-aa6dd872d100` | 05 Nov 04:55:17 UTC / 05:55:17 Lagos | 1 | 0 won / 1 lost = 0.0% | Informational (sample below 5) |
+| `CB-228318f7-fa45-41ba-bfbe-7b2c3fa3d865` | 05 Nov 05:13:18 UTC / 06:13:18 Lagos | 2 | 1 won / 1 lost = 50.0% | Informational (sample below 5) |
+| `CB-e192f7b0-3296-4a84-9c07-edd92367b049` | 05 Nov 05:31:18 UTC / 06:31:18 Lagos | 3 | 1 won / 2 lost = 33.3% | Informational (sample below 5) |
+| `CB-7459b00d-eafc-46a1-ac5e-b91672f26d24` | 05 Nov 05:49:18 UTC / 06:49:18 Lagos | 4 | 2 won / 2 lost = 50.0% | Informational (sample below 5) |
+| `CB-be4c9da4-cb7e-476b-82b8-890a353b6e90` | 05 Nov 06:07:20 UTC / 07:07:20 Lagos | 5 | 3 won / 2 lost = 60.0% | Informational (not below 40%) |
+| `CB-a902df65-e64f-4452-b378-c129fcf32c42` | 06 Nov 12:01:23 UTC / 13:01:23 Lagos | 6 | 3 won / 3 lost = 50.0% | Informational (not below 40%) |
+| `CB-32c11e6e-fce7-4d23-b846-d0d7c61e6b28` | 06 Nov 12:19:25 UTC / 13:19:25 Lagos | 7 | 3 won / 4 lost = 42.9% | Informational (not below 40%) |
+| `CB-31a245b9-ce4b-4164-be2d-9008e60e49b4` | 06 Nov 12:37:48 UTC / 13:37:48 Lagos | 8 | 3 won / 5 lost = 37.5% | **Caution** |
+| `CB-3a5ab0eb-168c-40d7-8691-e6bdad920595` | 06 Nov 12:41:37 UTC / 13:41:37 Lagos | 8 | 3 won / 5 lost = 37.5% | **Caution** |
+
+## History: 5 November run (threshold not met)
+
+The sections from here to "6 November follow-up" record the earlier run, kept as history.
+
 Approved cap: **seven calls total**, including the seed and any conditional final caution-check lock. The existing series is capped at six additional locks and can stop early; an eighth lock is forbidden. The observer never settles calls, writes memories or changes provider settings. Its timer is set to five minutes; actual observation timestamps are recorded, and host suspension or delayed execution is not backfilled with invented intermediate checks.
 
 Checked: 2026-11-05T06:09:20.308Z; 5 Nov 2026, 07:09:20 GMT+1.
 
-Status: **threshold-not-met**. No final call locked: 5 scored memories, 3 won / 2 lost, win rate 60.0%. Caution requires at least five wins/losses and a rate strictly below 40%.
+Status at that check: **threshold-not-met**. No final call locked: 5 scored memories, 3 won / 2 lost, win rate 60.0%. Caution requires at least five wins/losses and a rate strictly below 40%.
 
 Confirmed Mainnet memories: **5**. Verified scored memories: **5** (3 won / 2 lost). Win rate: **60.0%**.
 
@@ -883,6 +950,8 @@ npx.cmd tsx scripts/prove-caution-loop.ts --self-test
 }
 ```
 
-## 6 November follow-up in progress
+## 6 November follow-up
 
 The only group with at least five confirmed Mainnet memories was **@CryptoKaleo / BTC / bearish / 15m**, with **six confirmed, three wins and three losses (50%)**. It was also the only eligible 15-minute group with three or more losses. Series `RS-3bb6e432-d185-4e2f-aaac-64e17d5b3caa` started through the existing owner-confirmed route with six repeat slots and a seventh slot reserved for a conditional final lock. At **12:16 UTC / 13:16 Lagos**, one repeat was open and the group remained at 50%. The observer is following the same series using `scripts/prove-caution-loop.ts --follow-series --confirm-owner-lock`.
+
+Result: the series created 3 repeats (`CB-a902df65…`, `CB-32c11e6e…`, `CB-31a245b9…`), all settled by Tatum. After the two losses, the matching record fell to 3 won / 5 lost (37.5%), and the recall on `CB-31a245b9…` applied the caution. The series stopped with `CAUTION_TRIGGERED`. See [Caution warnings](#caution-warnings) above.
