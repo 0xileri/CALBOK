@@ -15,7 +15,7 @@ Live counts read on **6 November 2026 at 13:34 UTC** from the owner APIs `GET /a
 | Walrus Memory writing on Mainnet | Done | 41 memory jobs done, each with a distinct blob ID and a `mainnet` completion record. Cited blobs and job IDs in the [caution proof](proof/caution-loop-2026-11.md) |
 | At least 10 memories on Mainnet | Done: **41 / 10** | Live count above. Accepted, running or uncertain jobs are not counted |
 | Tatum RPC/Data APIs | Done | **OHLCV:** primary price source; 5 of 44 settlements used it, including public call [`CB-b09e0a56…`](https://calbok.xyz/call/CB-b09e0a56-915e-4938-928f-7565c63aed8c) and the four BTC 15m calls settled between 12:18 and 12:58 UTC on 6 November. **Sui gRPC:** `GetCoinInfo` verified 3 times, latest 11:58:56 UTC on 6 November ([Sui RPC proof](proof/tatum-sui-rpc-2026-11.md)) |
-| Published blog | TODO | Publish-ready source in [blog.md](blog.md). Publish it and replace `TODO_BLOG_URL` in the README |
+| Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [blog.md](blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live (`/api/health` ok). Public email sign-in is on |
 | Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public (confirmed 6 November) |
 | 2–3 min video | TODO | Outline in [demo-script.md](demo-script.md). Record, upload and replace `TODO_VIDEO_URL` in the README |
@@ -42,11 +42,11 @@ None of these are in the repository. Fill them in on the form; never commit secr
 | `MEMWAL_AGENT_ID` | TODO | The delegate's public agent ID. Not `MEMWAL_ACCOUNT_ID`, and never `MEMWAL_PRIVATE_KEY` |
 | Video link | TODO | After recording; also replaces `TODO_VIDEO_URL` |
 | Repository link | Ready once public | https://github.com/0xileri/CALBOK |
-| Blog link | TODO | After publishing; also replaces `TODO_BLOG_URL` |
+| Blog link | Ready | https://x.com/0xileri/status/2118721459472207930 |
 
 ## Next actions for the owner
 
-1. Publish the blog and record the video, then replace both placeholders in the README.
+1. Record the video, then replace `TODO_VIDEO_URL` in the README and in the blog.
 2. Fill in the form fields above.
 3. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
 
