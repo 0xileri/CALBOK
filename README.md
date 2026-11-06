@@ -71,7 +71,7 @@ The later call's terms were identical to the earlier ones; only the memory had c
 
 ## For judges
 
-Open [calbok.xyz](https://calbok.xyz/). Viewers need no account. Public email sign-in is **on**: any email can sign in with a one-time code, never a password (checked live on 6 November). Your own calls lock straight away; they are settled and remembered automatically when the deployment enables member provider access (`CALBOK_USER_PROVIDER_ACCESS=true`).
+Open [calbok.xyz](https://calbok.xyz/). Viewers need no account. Public email sign-in is **on**: any email can sign in with a one-time code, never a password (checked live on 6 November). Member provider access is on (`CALBOK_USER_PROVIDER_ACCESS=true`), so your own calls are settled, remembered on Walrus and recalled automatically, within member limits of 20 locks per UTC hour and 10 memory attempts per UTC day.
 
 Admin is owner-only, so the public proof is in these files: [caution warnings and learning loop](docs/proof/caution-loop-2026-11.md), [recall after restart](docs/proof/restart-recall-2026-11.md) and [Tatum Sui gRPC read](docs/proof/tatum-sui-rpc-2026-11.md). For a public Tatum-settled call, open [`CB-b09e0a56…`](https://calbok.xyz/call/CB-b09e0a56-915e-4938-928f-7565c63aed8c).
 

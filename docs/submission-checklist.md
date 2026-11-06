@@ -27,7 +27,7 @@ Live counts read on **6 November 2026 at 13:34 UTC** from the owner APIs `GET /a
 | Setting | Live state | Why it matters |
 | --- | --- | --- |
 | `CALBOK_PUBLIC_SIGNIN_ENABLED=true` | **On.** `GET /api/auth` reports `publicSignup: true` and email delivery configured | Judges can sign in with any email |
-| `CALBOK_USER_PROVIDER_ACCESS=true` | **Unverified.** No API exposes it | Required for a judge's own calls to settle, be remembered and be recalled automatically. Check it in Railway's variables before submitting. Member limits: 20 locks per UTC hour, 10 memory attempts per UTC day |
+| `CALBOK_USER_PROVIDER_ACCESS=true` | **On**, confirmed by the owner on 6 November (no API exposes it) | A judge's own calls settle, are remembered and are recalled automatically. Member limits: 20 locks per UTC hour, 10 memory attempts per UTC day |
 | Settlement worker | Running. Owner calls settled automatically, latest at 12:58:45 UTC | Calls settle without manual clicks |
 
 ## Submission form fields still needed
@@ -47,10 +47,9 @@ None of these are in the repository. Fill them in on the form; never commit secr
 ## Next actions for the owner
 
 1. Make the repository public.
-2. Confirm `CALBOK_USER_PROVIDER_ACCESS=true` in Railway if judges should see their own calls settle.
-3. Publish the blog and record the video, then replace both placeholders in the README.
-4. Fill in the form fields above.
-5. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
+2. Publish the blog and record the video, then replace both placeholders in the README.
+3. Fill in the form fields above.
+4. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
 
 ## Feature status
 
