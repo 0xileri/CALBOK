@@ -1,0 +1,8 @@
+# The brand kit zip must contain byte-identical copies of these files
+# (tests/brand-identity.test.ts). Keep them LF on every OS so a kit
+# rebuilt from a Windows checkout does not pick up CRLF endings.
+*.svg text eol=lf
+public/brand/*.html text eol=lf
+
+*.png binary
+*.zip binary
