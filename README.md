@@ -32,7 +32,7 @@ How it works: **Lock → Settle → Remember**. Settlement checks Tatum, Coinbas
 
 ## Status
 
-This deployed app has email accounts, live settlements and confirmed Mainnet memory proof. A live caution demonstration, restart/recall demonstration and final submission artifacts remain unfinished. Primary origin: [calbok.xyz](https://calbok.xyz/); alias: [calbok.up.railway.app](https://calbok.up.railway.app/). [Brand guide](https://calbok.xyz/brand/index.html).
+This deployed app has email accounts, live settlements and confirmed Mainnet memory proof: 38 completed Mainnet memories at the 6 November check. The restart/recall demonstration and a fresh Tatum Sui read are recorded in [restart recall proof](docs/proof/restart-recall-2026-11.md) and [Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md). A live caution demonstration, the demo video and final submission artifacts remain unfinished. See the [submission checklist](docs/submission-checklist.md) for current counts and blockers. Primary origin: [calbok.xyz](https://calbok.xyz/); alias: [calbok.up.railway.app](https://calbok.up.railway.app/). [Brand guide](https://calbok.xyz/brand/index.html).
 
 Implemented: branded responsive overview, call capture/detail, caller profiles, memory ledger, integration settings; SQLite persistence; SHA-256 snapshots; duplicate prevention; decimal directional settlement; server-side provider adapters; operator guard; bounded requests; contextual warning policy; automated tests.
 
@@ -40,7 +40,7 @@ My calls shows open windows and results, refreshed every 30 seconds. Call pages 
 
 Caller profiles include a searchable directory, performance filters by exact market, horizon and direction, and breakdowns with visible sample sizes. Win rates exclude pending, neutral and unreproducible results; stored candle evidence must reproduce the verdict. Receipt-history search, outcome filters and ordering do not change performance totals. Same-symbol tokens remain separate by chain and contract.
 
-Provider verification update (24 October 2026): Tatum Sui Mainnet gRPC coin metadata, one timestamp-validated historical BTC candle, Walrus authenticated recall, and GMGN search plus one VVV/Base historical candle now pass with locally configured credentials. See `docs/evidence/provider-verification.json` and `docs/evidence/gmgn-verification.json`. Confirmed writes are now visible on /proof; a real caution demonstration remains pending. Other markets need their own coverage checks.
+Provider verification update (24 October 2026): Tatum Sui Mainnet gRPC coin metadata, one timestamp-validated historical BTC candle, Walrus authenticated recall, and GMGN search plus one VVV/Base historical candle now pass with locally configured credentials. See `docs/evidence/provider-verification.json` and `docs/evidence/gmgn-verification.json`. Confirmed writes are now visible in the Admin integration proof; a real caution demonstration remains pending. Other markets need their own coverage checks.
 
 ## Run locally
 
@@ -124,7 +124,7 @@ See [architecture](docs/architecture.md), [scoring](docs/scoring.md), and [actua
 
 ## Official integration references
 
-[Tatum OHLCV](https://docs.tatum.io/reference/getsymbolohlcv), [Tatum Sui RPC](https://docs.tatum.io/reference/rpc-sui), [Walrus SDK usage](https://docs.wal.app/walrus-memory/sdk/usage/memwal), [Walrus SDK API](https://docs.wal.app/walrus-memory/sdk/api-reference). Documentation checked 24 October 2026. See the evidence files above for verified reads; Mainnet memory writes remain pending.
+[Tatum OHLCV](https://docs.tatum.io/reference/getsymbolohlcv), [Tatum Sui RPC](https://docs.tatum.io/reference/rpc-sui), [Walrus SDK usage](https://docs.wal.app/walrus-memory/sdk/usage/memwal), [Walrus SDK API](https://docs.wal.app/walrus-memory/sdk/api-reference). Documentation checked 24 October 2026. See the evidence files above for verified reads, and the [live run evidence](docs/proof/caution-loop-2026-11.md) for confirmed Mainnet memory writes.
 
 ## Sign-in and account boundaries
 
