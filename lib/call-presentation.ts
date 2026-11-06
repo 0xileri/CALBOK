@@ -12,3 +12,8 @@ export function callStatus(outcome:string,deadline:string,now=Date.now()){
 }
 export function priceChange(value:string|null){const number=Number(value);return value!==null&&Number.isFinite(number)?`${number>0?'+':''}${number.toFixed(2)}%`:null;}
 export function assetLabel(asset:string,symbol?:string|null){return symbol||(!asset.startsWith('gmgn:')?asset:asset.split(':')[1]+' · '+asset.split(':').slice(2).join(':').slice(0,8)+'…');}
+/** Tatum is the primary catalog price source. Coinbase USD, then Binance USDT, only settle a call when Tatum had no valid candle. */
+export function priceSourceLabel(provider:string|null|undefined){
+  if(!provider)return null;
+  return provider==='Coinbase'||provider==='Binance'?`${provider} (backup: Tatum candle unavailable)`:provider;
+}
