@@ -14,7 +14,8 @@ const ORIGIN='https://calbok.xyz';
 const GROUP={caller:'@CryptoKaleo',asset:'BTC',direction:'bearish' as const,horizon:'15m' as const};
 const POLL_MS=5*60_000;
 const LOCK_CAP=7;
-const OUTPUT=resolve('docs/proof/caution-loop-2026-11.md');
+let OUTPUT=resolve('docs/proof/caution-loop-2026-11.md');
+let followUp: {id:string;baseline:string[]}|undefined;
 type Workspace={settlement?:{jobs:{prediction_id:string;status:string;updated_at:string}[]};receipts:Receipt[];memoryJobs:MemoryJob[];recallReviews:Record<string,RecallReview>};
 type Series={id:string;caller:string;asset:string;direction:string;horizon:string;status:string;stop_reason:string|null;seed_id:string;current_id:string;target_count:number;created_count:number};
 type Snapshot={workspace:Workspace;proof:IntegrationProof;series:Series[]};
@@ -36,8 +37,11 @@ function groupHistory({workspace,proof}:Snapshot,before=Infinity){
  const wins=scored.filter(r=>r.outcome==='won').length,losses=scored.length-wins;
  return {confirmed,scored,wins,losses,winRate:scored.length?(wins/scored.length*100).toFixed(1):null,qualifies:scored.length>=5&&wins*100<40*scored.length};
 }
+function groupLockCount(snapshot:Snapshot){
+ return snapshot.workspace.receipts.filter(row=>sameGroup(row)&&!followUp?.baseline.includes(row.id)).length;
+}
 function ensureLockBudget(snapshot:Snapshot,kind:'seed'|'finalLock'){
- if(snapshot.workspace.receipts.filter(sameGroup).length>=LOCK_CAP)throw Error('Approved seven-call cap reached; no extra lock.');
+ if(groupLockCount(snapshot)>=LOCK_CAP)throw Error('Approved seven-call cap reached; no extra lock.');
  if(kind==='finalLock'&&snapshot.series.some(s=>sameGroup(s)&&s.status==='active'))throw Error('Stop the matching active series before the final lock.');
 }
 function utc(value:string|null){return value?new Date(value).toISOString():'not exposed';}
@@ -76,8 +80,14 @@ function observe(state:State,snapshot:Snapshot){
 async function main(){
  const args=new Set(process.argv.slice(2));
  if(args.has('--self-test')){await selfTest();return;}
- for(const arg of args)if(!['--inspect','--once','--prepare-seed','--wait-for-seed','--confirm-owner-lock'].includes(arg))throw Error('Unknown option.');
+ for(const arg of args)if(!['--inspect','--once','--prepare-seed','--wait-for-seed','--confirm-owner-lock','--follow-series'].includes(arg))throw Error('Unknown option.');
  const token=process.env.CALBOK_ADMIN_TOKEN;if(!token)throw Error('Set CALBOK_ADMIN_TOKEN in the process environment; no .env file is read.');
+ if(args.has('--follow-series')){
+  const run=JSON.parse(await readFile('data/final-proof-series.json','utf8'));
+  if(!/^RS-[a-f0-9-]{36}$/.test(run.id)||!Array.isArray(run.baseline)||!run.baseline.every((id:unknown)=>typeof id==='string'&&/^CB-[a-f0-9-]{36}$/.test(id)))throw Error('Invalid series checkpoint.');
+  followUp={id:run.id,baseline:run.baseline};
+  OUTPUT=resolve('data/caution-loop-follow-up.md');
+ }
  const api=client(token),state=await loadState();
  const runner=process.execArgv.includes('tsx')?'node --import tsx':'npx.cmd --yes @railway/cli run --service calbok --environment production --no-local -- npx.cmd tsx';
  const command=runner+' scripts/prove-caution-loop.ts'+(args.size?' '+[...args].join(' '):'');
@@ -99,6 +109,8 @@ async function main(){
  };
  while(true){
   const snapshot=await get(),history=observe(state,snapshot);
+  const tracked=followUp?snapshot.series.find(s=>s.id===followUp?.id&&sameGroup(s)):undefined;
+  if(followUp&&!tracked)throw Error('Approved series missing from the exact group.');
   if(args.has('--inspect')){if(!['caution-proven','threshold-not-met','recall-not-proven','lock-budget-exhausted'].includes(state.status)){state.status='inspected';state.reason=snapshot.workspace.receipts.some(sameGroup)?'Read-only inspection of the real 15m group; no writes performed by this inspection.':'No 15m seed exists. The series requires a normal prospective seed and verified Mainnet completion first.';}await save(state);return;}
   if(args.has('--prepare-seed')){
    if(history.confirmed.length||snapshot.workspace.receipts.some(sameGroup)){state.reason='A 15m receipt already exists; no additional seed submitted.';await save(state);return;}
@@ -107,10 +119,10 @@ async function main(){
   if(args.has('--wait-for-seed')){
    if(history.confirmed.length){state.status='seed-ready';state.reason='Verified 15m seed and Mainnet memory confirmed; series may now be started through the existing route.';await save(state);return;}
    if(!snapshot.workspace.receipts.some(sameGroup)){state.status='blocked';state.reason='No 15m seed exists. The existing series route requires one.';await save(state);return;}
-  }else if(history.confirmed.length>=5){
+  }else if(history.confirmed.length>=5&&(!followUp||history.qualifies||tracked?.status!=='active')){
    if(!history.qualifies){state.status='threshold-not-met';state.reason=`No final call locked: ${history.scored.length} scored memories, ${history.wins} won / ${history.losses} lost, win rate ${history.winRate??'undefined'}%. Caution requires at least five wins/losses and a rate strictly below 40%.`;await save(state);return;}
    if(state.series.some(s=>s.status==='active')){state.status='ready-for-owner-stop';state.reason='Five confirmed memories qualify. Stop the active series through its existing owner route before the single final lock, to preserve the approved seven-call cap.';await save(state);return;}
-   if(snapshot.workspace.receipts.filter(sameGroup).length>=LOCK_CAP&&!state.finalLock){state.status='lock-budget-exhausted';state.reason='Seven group calls already exist; no eighth call will be locked.';await save(state);return;}
+   if(groupLockCount(snapshot)>=LOCK_CAP&&!state.finalLock){state.status='lock-budget-exhausted';state.reason='Seven group calls already exist; no eighth call will be locked.';await save(state);return;}
    const fresh=await get(),eligible=groupHistory(fresh,Date.now());
    if(!eligible.qualifies){observe(state,fresh);state.status='threshold-not-met';state.reason='Fresh pre-lock history no longer qualifies; no lock submitted.';await save(state);return;}
    const id=await lock('finalLock',fresh),after=await get();observe(state,after);

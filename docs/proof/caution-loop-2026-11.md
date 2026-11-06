@@ -882,3 +882,7 @@ npx.cmd tsx scripts/prove-caution-loop.ts --self-test
   }
 }
 ```
+
+## 6 November follow-up in progress
+
+The only group with at least five confirmed Mainnet memories was **@CryptoKaleo / BTC / bearish / 15m**, with **six confirmed, three wins and three losses (50%)**. It was also the only eligible 15-minute group with three or more losses. Series `RS-3bb6e432-d185-4e2f-aaac-64e17d5b3caa` started through the existing owner-confirmed route with six repeat slots and a seventh slot reserved for a conditional final lock. At **12:16 UTC / 13:16 Lagos**, one repeat was open and the group remained at 50%. The observer is following the same series using `scripts/prove-caution-loop.ts --follow-series --confirm-owner-lock`.

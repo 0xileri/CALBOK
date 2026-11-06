@@ -128,3 +128,16 @@ test('progress ranks the closest exact group and computes win rate from verified
   {caller:'TEST',count:2,winRate:'0.0',closest:true},{caller:'OTHER',count:1,winRate:'0.0',closest:false}
  ]);
 });
+
+test('Sui proof lists the newest validated RPC summary first and excludes raw evidence fields',()=>{
+ const evidence=JSON.stringify({provider:'Tatum',network:'mainnet',method:'sui.rpc.v2.StateService/GetCoinInfo',symbol:'SUI',decimals:9,coinType:'0x2::sui::SUI',id:'0x'+'a'.repeat(64),responseHash:'b'.repeat(64),privateField:'PRIVATE_FIXTURE_SENTINEL'});
+ const proof=integrationProof([],[],[],[],[
+  {id:'old',evidence,verified_at:'2026-11-05T00:00:00Z'},
+  {id:'bad',evidence,verified_at:'invalid'},
+  {id:'latest',evidence,verified_at:'2026-11-06T00:00:00Z'},
+ ]);
+ assert.deepEqual(proof.sui.map(row=>row.id),['latest','old']);
+ assert.equal(proof.sui[0].method,'sui.rpc.v2.StateService/GetCoinInfo');
+ assert.match(proof.sui[0].summary,/9 decimals/);
+ assert.ok(!JSON.stringify(proof.sui).includes('PRIVATE_FIXTURE_SENTINEL'));
+});

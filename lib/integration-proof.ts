@@ -102,13 +102,15 @@ function replayRecall(record: RecallProof, locked: Receipt[], completed: Complet
   }];
 }
 
-function validSuiRead(row: OnchainProof) {
+function suiReadSummary(row: OnchainProof) {
   const evidence = parseObject(row.evidence);
-  return evidence?.provider==='Tatum' && evidence.network==='mainnet' &&
+  const valid = evidence?.provider==='Tatum' && evidence.network==='mainnet' &&
     evidence.method==='sui.rpc.v2.StateService/GetCoinInfo' && evidence.symbol==='SUI' && evidence.decimals===9 &&
     typeof evidence.coinType==='string' && /^0x0*2::sui::SUI$/.test(evidence.coinType) &&
     typeof evidence.id==='string' && /^0x[0-9a-fA-F]{64}$/.test(evidence.id) &&
     typeof evidence.responseHash==='string' && /^[0-9a-f]{64}$/.test(evidence.responseHash);
+  if (!valid || !Number.isFinite(Date.parse(row.verified_at))) return [];
+  return [{id:row.id,at:row.verified_at,method:'sui.rpc.v2.StateService/GetCoinInfo',summary:'Native SUI coin metadata verified with symbol SUI and 9 decimals.'}];
 }
 
 function nextStep(locked: Receipt[], settlements: ReturnType<typeof settlementRecord>, completed: CompletionProof[], recalls: ReturnType<typeof replayRecall>) {
@@ -147,7 +149,7 @@ export function integrationProof(receipts: Receipt[], jobs: MemoryJob[], complet
   const recalled = recalls.flatMap(record=>replayRecall(record,locked,completed));
   const citedRecalls = recalled.filter(row=>row.citedIds.length>0);
   const adapted = citedRecalls.filter(row=>row.adapted);
-  const sui = onchain.filter(validSuiRead).map(row=>({id:row.id,at:row.verified_at}));
+  const sui = onchain.flatMap(suiReadSummary).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
   const stages = [
     {key:'lock',label:'Lock a forward-looking call',count:locked.length,receiptId:locked[0]?.id},
     {key:'settle',label:'Verify a settled outcome',count:settlements.length,receiptId:settlements[0]?.receiptId},

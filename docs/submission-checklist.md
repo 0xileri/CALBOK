@@ -1,10 +1,10 @@
-# Actual readiness — 4 November 2026
+# Actual readiness — 6 November 2026
 
-Public email sign-in is enabled (confirmed through production /api/auth). Earlier baseline: **32 settled, 32 Mainnet memories, recall 1, caution pending**. The 4 November production recheck now shows **34 locks, 33 settled, 32 Mainnet memories, recall 1, caution 0**. These are private-workspace observations, not a promise of current public counts. [Public proof](https://calbok.xyz/proof) now counts only explicitly published, visible owner receipts. Existing calls default to private and are not automatically published. Missing proof is not a provider failure.
+Production owner proof reports **40 locks, 40 verified settlements, 38 confirmed Mainnet memories, six SQL-cited recalls and zero caution events at the initial 6 November check**. The recorded 15-minute run recalled five matching memories at a 60% win rate. Caution requires a rate below 40%. See [the live run evidence](proof/caution-loop-2026-11.md).
 
 ## Next action for the owner
 
-**Demonstrate a later same-group call recalling completed memories and, when five verified wins/losses produce a win rate below 40%, a genuine caution.** Also verify restart/recall and record the demo.
+Record the existing five-memory recall using [the demo script](demo-script.md). The follow-up series is gathering real results for the caution check. The fresh Sui read and post-restart recall are documented below.
 
 | Requirement | Status / proof |
 | --- | --- |
@@ -12,17 +12,17 @@ Public email sign-in is enabled (confirmed through production /api/auth). Earlie
 | Caller profiles | Implemented: captured/reviewed counts and captured history alongside separately verified performance |
 | Immutable prospective SQL capture | Implemented and tested; first genuine live receipt locked |
 | Deterministic directional settlement | Reproducibility tested; historical provider samples checked previously. First genuine live lock → deadline → settlement verified |
-| Relevant Tatum Sui Mainnet read | Prior real gRPC GetCoinInfo proof recorded in evidence document. Integration proof screen counts only validated metadata actually stored in this workspace |
-| Walrus Mainnet remember → done → recall | 32 confirmed Mainnet completions and 1 SQL-cited recall; live caution pending |
-| 10 completed Mainnet memories | **32 / 10 confirmed** at the dated check. Accepted/running jobs do not count |
-| Replayable adaptation | Policy tested; live demonstration pending. At least five relevant memories must have completed before a later target call was locked for caution proof |
+| Relevant Tatum Sui Mainnet read | Fresh Tatum gRPC GetCoinInfo verified at 11:58:56 UTC on 6 November. [RPC evidence](proof/tatum-sui-rpc-2026-11.md) |
+| Walrus Mainnet remember → done → recall | 38 confirmed Mainnet completions and six SQL-cited recalls |
+| 10 completed Mainnet memories | **38 / 10 confirmed** at the dated check. Accepted/running jobs do not count |
+| Replayable adaptation | Follow-up series active at the 12:16 UTC check on 6 November. The exact BTC bearish 15m group stood at 3 wins / 3 losses (50%). [Caution evidence](proof/caution-loop-2026-11.md) |
 | Integration proof screen | Implemented: read-only owner-scoped progress plus public /proof with allowlisted stage counts and settlement fields, job/blob completion evidence, persisted SQL-linked recall, side-by-side comparison, JSON export, next action and explicit manual requirements. No provider calls are triggered by viewing it |
 | Durable worker | Leases, retries, heartbeat and bounded settlement batches implemented/tested. Owner opt-in enables up to ten automatic Mainnet write attempts |
 | Deployment and access | Primary workspace at https://calbok.xyz via `CALBOK_PUBLIC_ORIGIN`, with https://calbok.up.railway.app in `CALBOK_ADDITIONAL_ORIGINS`. Private journal APIs, persistent volume, GitHub deployments, email sessions and account controls. Public email sign-in enabled; member provider access requires CALBOK_USER_PROVIDER_ACCESS=true, with 20 locks/hour and 10 writes/UTC day per member |
 | Public homepage / branding | Implemented with workflow, privacy limits, brand kit and sign-in |
 | Public repository and blog | Source on private 0xileri/CALBOK; public visibility and published blog not verified |
 | Demo video | Pending; script outline in demo-script.md |
-| Restart/recall demonstration | Pending; persisted records alone do not prove a recall performed after restart |
+| Restart/recall demonstration | Verified by fresh recall on both sides of a Railway restart. All five cited receipt/job/blob rows and both win rates matched. [Restart evidence](proof/restart-recall-2026-11.md) |
 | Official rules and submission | Current rules, eligibility and submission completion still require verification. Do not commit entrant information |
 
 ## Evidence rules
