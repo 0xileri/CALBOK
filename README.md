@@ -1,10 +1,26 @@
 # CALBOK
 
+Entry for the Tatum x Walrus Total Recall hackathon (Oct 20 – Nov 10, 2026) · Markets & Sports Prediction track · Also entering Best Walrus Memory.
+
 **The internet makes calls. CALBOK remembers receipts.**
 
-[Live app](https://calbok.xyz/) · [GitHub repository](https://github.com/0xileri/CALBOK) · [Brand guide](https://calbok.xyz/brand/index.html)
+[Live app](https://calbok.xyz/) · [Demo video](TODO_VIDEO_URL) · [Blog post](TODO_BLOG_URL) · [Repository](https://github.com/0xileri/CALBOK)
 
 CALBOK is a prediction accountability app. You lock a market call before the outcome is known, CALBOK settles it against real price candles when the window closes, writes the verified result to Walrus Mainnet memory, and recalls that history the next time the same caller makes the same kind of call. If a caller's matching record is poor, the new call gets a caution.
+
+## Hackathon requirements
+
+Live counts read from the app on 6 November 2026 at 13:34 UTC.
+
+| Requirement | Status | Proof |
+| --- | --- | --- |
+| Walrus Memory writing on Mainnet | Done | Verified results are queued and written through MemWal automatically (`lib/automatic-memory.ts`). Cited blob IDs in the [caution proof](docs/proof/caution-loop-2026-11.md); survives restart per the [restart recall proof](docs/proof/restart-recall-2026-11.md) |
+| At least 10 memories on Mainnet | Done: **41** | 41 memory jobs done with a blob ID and a `mainnet` completion record. The [public feed](https://calbok.xyz/feed) counts 32 of them on public calls |
+| Tatum RPC/Data APIs (OHLCV plus Sui gRPC) | Done | **OHLCV:** primary price source; 5 settlements so far, e.g. public call [`CB-b09e0a56…`](https://calbok.xyz/call/CB-b09e0a56-915e-4938-928f-7565c63aed8c). **Sui gRPC:** `GetCoinInfo` verified 3 times, latest 6 Nov 11:58:56 UTC ([Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md)) |
+| Published blog | TODO | TODO_BLOG_URL. Draft in [docs/blog-draft.md](docs/blog-draft.md), not published |
+| Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live; public email sign-in is on |
+| Public repo | TODO | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is still private |
+| 2–3 min video | TODO | TODO_VIDEO_URL. Outline in [docs/demo-script.md](docs/demo-script.md) |
 
 ## How it works
 
@@ -21,15 +37,43 @@ CALBOK is a prediction accountability app. You lock a market call before the out
 | --- | --- | --- | --- |
 | **Tatum OHLCV** | Primary source of one-minute price candles for settlement, across the 439 symbols in Tatum's OHLCV catalog | `lib/providers.ts` | [provider verification](docs/evidence/provider-verification.json) |
 | **Tatum Sui gRPC** | `sui.rpc.v2.StateService/GetCoinInfo` over Tatum's Sui Mainnet gateway, run from Admin → **Check Sui identity** | `lib/providers.ts` | [Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md) |
-| **Walrus Memory (MemWal)** | Mainnet memory of every verified outcome, and recall with SQL-checked citations | `lib/automatic-memory.ts`, `lib/receipt-recall.ts` | [live run](docs/proof/caution-loop-2026-11.md), [restart recall](docs/proof/restart-recall-2026-11.md) |
+| **Walrus Memory (MemWal)** | Mainnet memory of verified outcomes, and recall with SQL-checked citations | `lib/automatic-memory.ts`, `lib/receipt-recall.ts` | [live run](docs/proof/caution-loop-2026-11.md), [restart recall](docs/proof/restart-recall-2026-11.md) |
 
 **Price source order.** Tatum is always asked first. It gets five minutes after the boundary minute to publish a valid candle, and the worker rechecks every minute in that window. Coinbase USD, then Binance USDT, are backups used only when Tatum answers with a stale or different minute, returns 404, or is still lagging, down or malformed after five minutes. Entry and exit always come from the same source, and the call page labels a backup as `Coinbase (backup: Tatum candle unavailable)`. GMGN covers onchain tokens selected by chain and contract.
 
-On 5 November, every Tatum OHLCV request returned the same BTC candle from 29 October 14:29 UTC, so the settlements recorded so far used the Coinbase backup. Sui metadata proves coin identity, not historical prices.
+Between 04:33 and 06:24 UTC on 5 November, every Tatum OHLCV request for BTC returned the same candle from 29 October 14:29 UTC, so those settlements used the Coinbase backup. Tatum is primary again as of 6 November: it settled `CB-a902df65…`, `CB-32c11e6e…`, `CB-31a245b9…` and `CB-3a5ab0eb…` between 12:18 and 12:58 UTC, and commit `de0db2a` (deployed 13:00 UTC) gives it a five-minute window before any backup. No call had settled since that deploy at the 13:34 UTC check. Across all 44 settlements: Coinbase 28, Binance 10, Tatum 5, GMGN 1. Sui metadata proves coin identity, not historical prices.
+
+## How CALBOK learned over time
+
+One real group: **@CryptoKaleo, BTC, bearish, 15m**. These earlier calls settled and were written to Walrus Mainnet:
+
+| # | Earlier call | Result | Walrus blob ID |
+| --- | --- | --- | --- |
+| 1 | `CB-afeb1880-4caa-4a86-b2a0-39f2d7aa1b0d` | lost | `nNqALC2eg55hQId_kc158Z3bzLYBDmGcM7YGkyHsEiE` |
+| 2 | `CB-1d6e5327-66d9-400f-b044-aa6dd872d100` | won | `VCMDRpE-tUV319QKNEcTnkXqjpqXS7KfCPs5JlNsr3c` |
+| 3 | `CB-228318f7-fa45-41ba-bfbe-7b2c3fa3d865` | lost | `y9pmW4KMs7dpQSynfdTr84OVyPVQL_pIROfE9Cp_45Y` |
+| 4 | `CB-e192f7b0-3296-4a84-9c07-edd92367b049` | won | `qAuSHVS5TFxY87uTJcezclK1bWKBoE5DRUHhNAPZ0TU` |
+| 5 | `CB-7459b00d-eafc-46a1-ac5e-b91672f26d24` | won | `XXRJPBo2JplvG_Q8Ohzw7VV4FG926RZMEPCOCVuQH0Q` |
+| 6 | `CB-be4c9da4-cb7e-476b-82b8-890a353b6e90` | lost | `LaxyYbn5gHFM5GQVdlvk4SoEjC6AeqKkIlAOa4b-Kc8` |
+| 7 | `CB-a902df65-e64f-4452-b378-c129fcf32c42` | lost | `SCGWdKEiK4brBRukbAZourl_GSPrUchCkRm97q3QuYs` |
+| 8 | `CB-32c11e6e-fce7-4d23-b846-d0d7c61e6b28` | lost | `91EYfkeIoYWpGy95UteeAxrSmUSKwYCr6bl6PLDPv-A` |
+
+As each memory landed, recall on the next call in the group cited it, and the matching record moved from 60% (5 calls) to 50%, 42.9% and then **37.5%** (3 won, 5 lost).
+
+The later call `CB-31a245b9-ce4b-4164-be2d-9008e60e49b4` locked at 12:37:46 UTC on 6 November (13:37:46 Lagos). 2.6 seconds later its recall cited all 8 memories above. Each was completed before the lock and re-checked against SQL. The record was under 40% with at least 5 calls, so the call got the warning:
+
+> **Caution: matching calls have a low win rate.**
+> 37.5% won across 8 matching calls. Open Proof details to inspect the cited results.
+
+The repeat series that created it stopped itself (`CAUTION_TRIGGERED`). A second call, `CB-3a5ab0eb…`, got the same warning at 12:41:37 UTC. Full timeline, job IDs and checks: [caution proof](docs/proof/caution-loop-2026-11.md). Only the first call is an original logged call; the rest are owner-scheduled repeats of the same terms, and all are private.
+
+The later call's terms were identical to the earlier ones; only the memory had changed, and memory changes what the product shows.
 
 ## For judges
 
-Open [calbok.xyz](https://calbok.xyz/). Viewers need no account. Loggers sign in with **email and a one-time code**, never a password.
+Open [calbok.xyz](https://calbok.xyz/). Viewers need no account. Public email sign-in is **on**: any email can sign in with a one-time code, never a password (checked live on 6 November). Your own calls lock straight away; they are settled and remembered automatically when the deployment enables member provider access (`CALBOK_USER_PROVIDER_ACCESS=true`).
+
+Admin is owner-only, so the public proof is in these files: [caution warnings and learning loop](docs/proof/caution-loop-2026-11.md), [recall after restart](docs/proof/restart-recall-2026-11.md) and [Tatum Sui gRPC read](docs/proof/tatum-sui-rpc-2026-11.md). For a public Tatum-settled call, open [`CB-b09e0a56…`](https://calbok.xyz/call/CB-b09e0a56-915e-4938-928f-7565c63aed8c).
 
 | Page | What to do |
 | --- | --- |
@@ -49,13 +93,27 @@ Calls are **Private** by default. Publishing needs a public username and an expl
 
 ## Status
 
-Live at [calbok.xyz](https://calbok.xyz/) (alias [calbok.up.railway.app](https://calbok.up.railway.app/)) with email accounts, automatic settlement and confirmed Mainnet memory: 38 completed Mainnet memories at the 6 November check. Recall after a Railway restart and a fresh Tatum Sui read are recorded in [restart recall proof](docs/proof/restart-recall-2026-11.md) and [Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md).
+Live at [calbok.xyz](https://calbok.xyz/) (alias [calbok.up.railway.app](https://calbok.up.railway.app/)). On 6 November 2026 at 13:34 UTC the app reported:
 
-Still open: a live caution demonstration (the exact group being followed stood at 50%, and caution needs below 40%), the demo video and the final submission. See the [submission checklist](docs/submission-checklist.md) for current counts and blockers.
+| Locked | Settled | Mainnet memories | Recalls | Caution warnings |
+| --- | --- | --- | --- | --- |
+| 44 | 44 | 41 | 12 | 2 |
+
+Recall after a Railway restart and a fresh Tatum Sui read are recorded in [restart recall proof](docs/proof/restart-recall-2026-11.md) and [Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md). Still open: the demo video, the blog post, making the repository public and the final submission. See the [submission checklist](docs/submission-checklist.md).
 
 ## Run locally
 
 Requires **Node.js 24.19+** (for built-in `node:sqlite`) and npm. SQLite is experimental in Node 24, so expect a runtime warning.
+
+macOS / Linux:
+
+```bash
+npm ci
+cp .env.example .env.local
+npm run dev
+```
+
+Windows PowerShell:
 
 ```powershell
 npm.cmd ci
@@ -74,19 +132,40 @@ Set a random `CALBOK_ADMIN_TOKEN` in `.env.local`, open [CALBOK](http://127.0.0.
 
 Set `TATUM_API_KEY`, `MEMWAL_PRIVATE_KEY` and `MEMWAL_ACCOUNT_ID` in `.env.local`. Add `GMGN_API_KEY` for onchain token search. `MEMWAL_ACCOUNT_ID` is the account object, not the delegate's public agent ID. `MEMWAL_SERVER_URL` optionally selects a trusted relayer. Set `MEMWAL_NETWORK=mainnet` only after confirming the account and relayer target Mainnet; the flag is an operator attestation, not network proof.
 
-```powershell
-npm.cmd run providers:verify
+```bash
+npm run providers:verify
 ```
+
+On Windows PowerShell, use `npm.cmd` in place of `npm` here and below.
 
 This makes paid-credit Tatum reads only when a key is present (SUI metadata over gRPC and an hour-old BTC candle) and checks authenticated Walrus recall in a separate connection-check namespace, without writing memories. Results are saved without credentials to `docs/evidence/provider-verification.json`. Without a Tatum key it exits nonzero and names the blocker.
 
-To see whether Tatum's candles are current, ask for a minute from ten minutes ago and compare the `openTime` it prints:
+To see whether Tatum's candles are current, ask for a minute from ten minutes ago and compare the `openTime` it prints.
+
+macOS / Linux:
+
+```bash
+npx tsx scripts/probe-tatum.ts $(( ($(date +%s) - 600) * 1000 ))
+```
+
+Windows PowerShell:
 
 ```powershell
 npx.cmd tsx scripts/probe-tatum.ts ([DateTimeOffset]::UtcNow.AddMinutes(-10).ToUnixTimeMilliseconds())
 ```
 
 ## Checks
+
+macOS / Linux:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+Windows PowerShell:
 
 ```powershell
 npm.cmd run lint
@@ -111,13 +190,13 @@ CI runs the same four steps on every push to `main` and every pull request. `npm
 
 ## Coin discovery and provider choice
 
-The catalog holds all 439 symbols from Tatum's OHLCV schema. Refresh it with `npm.cmd run assets:sync`, which reads only the symbol list from Tatum's documentation and makes no paid query per symbol.
+The catalog holds all 439 symbols from Tatum's OHLCV schema. Refresh it with `npm run assets:sync`, which reads only the symbol list from Tatum's documentation and makes no paid query per symbol.
 
 GMGN is a query-only, server-side integration. Search by name, symbol or contract, then confirm the exact chain and address, since symbols alone are not unique. A GMGN token gets a canonical `gmgn:chain:address` ID that is locked into the call snapshot, and it never falls back to another provider. No GMGN signing key, wallet or trading endpoint is used.
 
-```powershell
-npm.cmd run gmgn:verify
-npm.cmd run gmgn:verify -- gmgn:base:0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf
+```bash
+npm run gmgn:verify
+npm run gmgn:verify -- gmgn:base:0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf
 ```
 
 The first checks GMGN without writing calls or memories; the second also saves public candle evidence for the Base VVV contract. See [coin coverage and provider comparison](docs/coin-coverage.md). Dune was evaluated but not integrated: its interpolated minute prices do not meet the candle-open scoring contract.
@@ -146,6 +225,6 @@ The simplified app no longer links the private call inbox (text and screenshot c
 
 ## More documentation
 
-[Architecture](docs/architecture.md) · [Scoring contract](docs/scoring.md) · [Railway operations](docs/railway.md) · [Coin coverage](docs/coin-coverage.md) · [Demo runbook](docs/demo-runbook.md) · [Submission checklist](docs/submission-checklist.md)
+[Architecture](docs/architecture.md) · [Brand guide](https://calbok.xyz/brand/index.html) · [Scoring contract](docs/scoring.md) · [Railway operations](docs/railway.md) · [Coin coverage](docs/coin-coverage.md) · [Demo runbook](docs/demo-runbook.md) · [Submission checklist](docs/submission-checklist.md)
 
 Official references: [Tatum OHLCV](https://docs.tatum.io/reference/getsymbolohlcv), [Tatum Sui RPC](https://docs.tatum.io/reference/rpc-sui), [Walrus SDK usage](https://docs.wal.app/walrus-memory/sdk/usage/memwal), [Walrus SDK API](https://docs.wal.app/walrus-memory/sdk/api-reference).
