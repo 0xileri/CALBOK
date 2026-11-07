@@ -18,7 +18,7 @@ Live counts read on **6 November 2026 at 13:34 UTC** from the owner APIs `GET /a
 | Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [blog.md](blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live (`/api/health` ok). Public email sign-in is on |
 | Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public (confirmed 6 November) |
-| 2–3 min video | Done (1:54) | [YouTube](https://youtu.be/81beRv0EwWg) and [X](https://x.com/calbokdotxyz/status/2119059904140829157): real recordings of calbok.xyz, AI voiceover, captions |
+| 2–3 min video | Done (2:34) | [YouTube](https://youtu.be/h_7_WKAmff8): real recordings of calbok.xyz, AI voiceover, captions. An earlier 1:54 cut is [on X](https://x.com/calbokdotxyz/status/2119059904140829157) |
 | Memory-driven adaptation | Done | Two caution warnings on 6 November, each citing 8 matching Mainnet memories at 37.5% (3 won, 5 lost). The repeat series stopped itself with `CAUTION_TRIGGERED`. [Caution proof](proof/caution-loop-2026-11.md) |
 | Recall survives restart | Done | Fresh recall before and after a Railway restart matched on all cited receipt, job and blob rows. [Restart proof](proof/restart-recall-2026-11.md) |
 
@@ -40,7 +40,7 @@ None of these are in the repository. Fill them in on the form; never commit secr
 | SUI address | TODO | The public Sui address the form asks for. Never a private key |
 | SUI account ID | TODO | If the form means the MemWal account, it is the public object ID set as `MEMWAL_ACCOUNT_ID` in Railway |
 | `MEMWAL_AGENT_ID` | TODO | The delegate's public agent ID. Not `MEMWAL_ACCOUNT_ID`, and never `MEMWAL_PRIVATE_KEY` |
-| Video link | Ready | https://youtu.be/81beRv0EwWg |
+| Video link | Ready | https://youtu.be/h_7_WKAmff8 |
 | Repository link | Ready once public | https://github.com/0xileri/CALBOK |
 | Blog link | Ready | https://x.com/0xileri/status/2118721459472207930 |
 
