@@ -89,7 +89,7 @@ An accountability tool that fudges its own numbers is worse than none.
 
 ## Try it
 
-- **Watch the 2-minute demo:** [on YouTube](https://youtu.be/81beRv0EwWg)
+- **Watch the demo (2:34):** [on YouTube](https://youtu.be/h_7_WKAmff8)
 - **Browse:** the [live feed](https://calbok.xyz/feed) needs no account. Open any card to see its lock time, price source and Walrus blob ID.
 - **Log a call:** [sign in](https://calbok.xyz/signin) with any email and a one-time code, pick a 15m window, and see the result and its memory shortly after it closes.
 - **Check the proof:** the [caution proof](https://github.com/0xileri/CALBOK/blob/main/docs/proof/caution-loop-2026-11.md) lists every receipt, job and blob ID behind the warning above, next to the [restart test](https://github.com/0xileri/CALBOK/blob/main/docs/proof/restart-recall-2026-11.md) and the [Tatum Sui read](https://github.com/0xileri/CALBOK/blob/main/docs/proof/tatum-sui-rpc-2026-11.md).
