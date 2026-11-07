@@ -15,10 +15,10 @@ Live counts read on **6 November 2026 at 13:34 UTC** from the owner APIs `GET /a
 | Walrus Memory writing on Mainnet | Done | 41 memory jobs done, each with a distinct blob ID and a `mainnet` completion record. Cited blobs and job IDs in the [caution proof](proof/caution-loop-2026-11.md) |
 | At least 10 memories on Mainnet | Done: **41 / 10** | Live count above. Accepted, running or uncertain jobs are not counted |
 | Tatum RPC/Data APIs | Done | **OHLCV:** primary price source; 5 of 44 settlements used it, including public call [`CB-b09e0a56…`](https://calbok.xyz/call/CB-b09e0a56-915e-4938-928f-7565c63aed8c) and the four BTC 15m calls settled between 12:18 and 12:58 UTC on 6 November. **Sui gRPC:** `GetCoinInfo` verified 3 times, latest 11:58:56 UTC on 6 November ([Sui RPC proof](proof/tatum-sui-rpc-2026-11.md)) |
-| Published blog | TODO | Draft in [blog-draft.md](blog-draft.md). Publish it and replace `TODO_BLOG_URL` in the README |
+| Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [blog.md](blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live (`/api/health` ok). Public email sign-in is on |
-| Public repo | TODO | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is **private**. Make it public before submitting; the README's proof links only open for judges after that |
-| 2–3 min video | TODO | Outline in [demo-script.md](demo-script.md). Record, upload and replace `TODO_VIDEO_URL` in the README |
+| Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public (confirmed 6 November) |
+| 2–3 min video | Done (1:54) | [YouTube](https://youtu.be/81beRv0EwWg) and [X](https://x.com/calbokdotxyz/status/2119059904140829157): real recordings of calbok.xyz, AI voiceover, captions |
 | Memory-driven adaptation | Done | Two caution warnings on 6 November, each citing 8 matching Mainnet memories at 37.5% (3 won, 5 lost). The repeat series stopped itself with `CAUTION_TRIGGERED`. [Caution proof](proof/caution-loop-2026-11.md) |
 | Recall survives restart | Done | Fresh recall before and after a Railway restart matched on all cited receipt, job and blob rows. [Restart proof](proof/restart-recall-2026-11.md) |
 
@@ -40,16 +40,14 @@ None of these are in the repository. Fill them in on the form; never commit secr
 | SUI address | TODO | The public Sui address the form asks for. Never a private key |
 | SUI account ID | TODO | If the form means the MemWal account, it is the public object ID set as `MEMWAL_ACCOUNT_ID` in Railway |
 | `MEMWAL_AGENT_ID` | TODO | The delegate's public agent ID. Not `MEMWAL_ACCOUNT_ID`, and never `MEMWAL_PRIVATE_KEY` |
-| Video link | TODO | After recording; also replaces `TODO_VIDEO_URL` |
+| Video link | Ready | https://youtu.be/81beRv0EwWg |
 | Repository link | Ready once public | https://github.com/0xileri/CALBOK |
-| Blog link | TODO | After publishing; also replaces `TODO_BLOG_URL` |
+| Blog link | Ready | https://x.com/0xileri/status/2118721459472207930 |
 
 ## Next actions for the owner
 
-1. Make the repository public.
-2. Publish the blog and record the video, then replace both placeholders in the README.
-3. Fill in the form fields above.
-4. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
+1. Fill in the form fields above.
+2. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
 
 ## Feature status
 

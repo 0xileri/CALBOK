@@ -118,4 +118,10 @@ body:has(.ocean-site) { background:#142c25; color:#f4f2e9; color-scheme:dark; }
 
 /* Owner controls and small status badges share the same identity. */
 .ocean-site .call-detail-page .publication-controls .button.primary { background:#ef7145; color:#142c25; border-color:#ef7145; }
+/* Settlement evidence sits on the dark page: light text there, forest text on the cream price cards. */
+.ocean-site .evidence-reader { border-top-color:#d5e6bf30; }
+.ocean-site .evidence-reader p,.ocean-site .evidence-change span { color:#d5e6bf; }
+.ocean-site .evidence-change { border-bottom-color:#d5e6bf30; }
+.ocean-site .evidence-change strong { color:#f4f2e9; }
+.ocean-site .evidence-prices p { color:#596653; }
 .ocean-site .badge { background:#d5e6bf; color:#142c25; border-color:#c8d0bc; }
