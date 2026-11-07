@@ -18,7 +18,7 @@ Live counts read on **6 November 2026 at 13:34 UTC** from the owner APIs `GET /a
 | Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [blog.md](blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live (`/api/health` ok). Public email sign-in is on |
 | Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public (confirmed 6 November) |
-| 2–3 min video | Done (2:34) | [YouTube](https://youtu.be/h_7_WKAmff8): real recordings of calbok.xyz, AI voiceover, captions. An earlier 1:54 cut is [on X](https://x.com/calbokdotxyz/status/2119059904140829157) |
+| 2–3 min video | Done (1:54) | [YouTube](https://youtu.be/h_7_WKAmff8) and [X](https://x.com/calbokdotxyz/status/2119059904140829157): real recordings of calbok.xyz, AI voiceover, captions |
 | Memory-driven adaptation | Done | Two caution warnings on 6 November, each citing 8 matching Mainnet memories at 37.5% (3 won, 5 lost). The repeat series stopped itself with `CAUTION_TRIGGERED`. [Caution proof](proof/caution-loop-2026-11.md) |
 | Recall survives restart | Done | Fresh recall before and after a Railway restart matched on all cited receipt, job and blob rows. [Restart proof](proof/restart-recall-2026-11.md) |
 
