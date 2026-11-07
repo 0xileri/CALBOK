@@ -20,7 +20,7 @@ Live counts read from the app on 6 November 2026 at 13:34 UTC.
 | Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [docs/blog.md](docs/blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live; public email sign-in is on |
 | Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public |
-| 2–3 min video | Done (1:54) | [YouTube](https://youtu.be/h_7_WKAmff8) · [on X](https://x.com/calbokdotxyz/status/2119059904140829157). Real recordings of calbok.xyz with voiceover and captions |
+| 2–3 min video | Done | [YouTube](https://youtu.be/h_7_WKAmff8) · [on X](https://x.com/calbokdotxyz/status/2119059904140829157). Real recordings of calbok.xyz with voiceover and captions |
 
 ## How it works
 
