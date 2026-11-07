@@ -18,7 +18,7 @@ Live counts read on **6 November 2026 at 13:34 UTC** from the owner APIs `GET /a
 | Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [blog.md](blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live (`/api/health` ok). Public email sign-in is on |
 | Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public (confirmed 6 November) |
-| 2–3 min video | TODO | Outline in [demo-script.md](demo-script.md). Record, upload and replace `TODO_VIDEO_URL` in the README |
+| 2–3 min video | Done (1:54) | [YouTube](https://youtu.be/81beRv0EwWg) and [X](https://x.com/calbokdotxyz/status/2119059904140829157): real recordings of calbok.xyz, AI voiceover, captions |
 | Memory-driven adaptation | Done | Two caution warnings on 6 November, each citing 8 matching Mainnet memories at 37.5% (3 won, 5 lost). The repeat series stopped itself with `CAUTION_TRIGGERED`. [Caution proof](proof/caution-loop-2026-11.md) |
 | Recall survives restart | Done | Fresh recall before and after a Railway restart matched on all cited receipt, job and blob rows. [Restart proof](proof/restart-recall-2026-11.md) |
 
@@ -40,15 +40,14 @@ None of these are in the repository. Fill them in on the form; never commit secr
 | SUI address | TODO | The public Sui address the form asks for. Never a private key |
 | SUI account ID | TODO | If the form means the MemWal account, it is the public object ID set as `MEMWAL_ACCOUNT_ID` in Railway |
 | `MEMWAL_AGENT_ID` | TODO | The delegate's public agent ID. Not `MEMWAL_ACCOUNT_ID`, and never `MEMWAL_PRIVATE_KEY` |
-| Video link | TODO | After recording; also replaces `TODO_VIDEO_URL` |
+| Video link | Ready | https://youtu.be/81beRv0EwWg |
 | Repository link | Ready once public | https://github.com/0xileri/CALBOK |
 | Blog link | Ready | https://x.com/0xileri/status/2118721459472207930 |
 
 ## Next actions for the owner
 
-1. Record the video, then replace `TODO_VIDEO_URL` in the README and in the blog.
-2. Fill in the form fields above.
-3. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
+1. Fill in the form fields above.
+2. Optional: the caution group's 10 calls are all private, so judges can only check them through the proof doc. Publishing makes their call pages public, but it is one-way and shows the caller handle.
 
 ## Feature status
 

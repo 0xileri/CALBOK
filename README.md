@@ -4,7 +4,7 @@ Entry for the Tatum x Walrus Total Recall hackathon (Oct 20 – Nov 10, 2026) ·
 
 **The internet makes calls. CALBOK remembers receipts.**
 
-[Live app](https://calbok.xyz/) · [Demo video](TODO_VIDEO_URL) · [Blog post](https://x.com/0xileri/status/2118721459472207930) · [Blog (source)](docs/blog.md) · [Repository](https://github.com/0xileri/CALBOK)
+[Live app](https://calbok.xyz/) · [Demo video](https://youtu.be/81beRv0EwWg) · [Demo on X](https://x.com/calbokdotxyz/status/2119059904140829157) · [Blog post](https://x.com/0xileri/status/2118721459472207930) · [Blog (source)](docs/blog.md) · [Repository](https://github.com/0xileri/CALBOK)
 
 CALBOK is a prediction accountability app. You lock a market call before the outcome is known, CALBOK settles it against real price candles when the window closes, writes the verified result to Walrus Mainnet memory, and recalls that history the next time the same caller makes the same kind of call. If a caller's matching record is poor, the new call gets a caution.
 
@@ -20,7 +20,7 @@ Live counts read from the app on 6 November 2026 at 13:34 UTC.
 | Published blog | Done | [Published on X](https://x.com/0xileri/status/2118721459472207930); source in [docs/blog.md](docs/blog.md) |
 | Working demo | Done | [calbok.xyz](https://calbok.xyz/) is live; public email sign-in is on |
 | Public repo | Done | [0xileri/CALBOK](https://github.com/0xileri/CALBOK) is public |
-| 2–3 min video | TODO | TODO_VIDEO_URL. Outline in [docs/demo-script.md](docs/demo-script.md) |
+| 2–3 min video | Done (1:54) | [YouTube](https://youtu.be/81beRv0EwWg) · [on X](https://x.com/calbokdotxyz/status/2119059904140829157). Real recordings of calbok.xyz with voiceover and captions |
 
 ## How it works
 
@@ -99,7 +99,7 @@ Live at [calbok.xyz](https://calbok.xyz/) (alias [calbok.up.railway.app](https:/
 | --- | --- | --- | --- | --- |
 | 44 | 44 | 41 | 12 | 2 |
 
-Recall after a Railway restart and a fresh Tatum Sui read are recorded in [restart recall proof](docs/proof/restart-recall-2026-11.md) and [Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md). Still open: the demo video and the final submission. See the [submission checklist](docs/submission-checklist.md).
+Recall after a Railway restart and a fresh Tatum Sui read are recorded in [restart recall proof](docs/proof/restart-recall-2026-11.md) and [Sui RPC proof](docs/proof/tatum-sui-rpc-2026-11.md). Still open: the final submission. See the [submission checklist](docs/submission-checklist.md).
 
 ## Run locally
 
